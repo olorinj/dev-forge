@@ -15,3 +15,4 @@ corepack enable 2>/dev/null || true
 corepack prepare pnpm@latest --activate 2>/dev/null || true
 
 echo "=== [dev-forge : Linux] 40-node: Node.js $(node -v) y npm $(npm -v) listos ==="
+

@@ -21,3 +21,4 @@ if ($env:PATH -notlike "*$cargoBin*") {
 }
 
 Write-Host "=== [dev-forge : Windows] 20-rust-msvc: Rust $(rustc --version) listo ===" -ForegroundColor Green
+

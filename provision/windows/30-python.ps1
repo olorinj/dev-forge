@@ -11,3 +11,4 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 python -m pip install --upgrade pip pyinstaller wheel setuptools
 
 Write-Host "=== [dev-forge : Windows] 30-python: Python $(python --version) configurado ===" -ForegroundColor Green
+

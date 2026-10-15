@@ -29,3 +29,4 @@ if ! command -v rcodesign >/dev/null 2>&1; then
 fi
 
 echo "=== [dev-forge : Linux] 60-macos-cross: Entorno de compilación y firma para macOS listo ==="
+

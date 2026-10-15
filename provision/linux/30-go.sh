@@ -25,3 +25,4 @@ chmod +x /etc/profile.d/golang.sh
 ln -sf /usr/local/go/bin/* /usr/local/bin/ 2>/dev/null || true
 
 echo "=== [dev-forge : Linux] 30-go: Toolchain de Go configurado con éxito ==="
+

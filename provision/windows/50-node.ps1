@@ -9,3 +9,4 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "=== [dev-forge : Windows] 50-node: Node $(node -v) y npm $(npm -v) configurados ===" -ForegroundColor Green
+

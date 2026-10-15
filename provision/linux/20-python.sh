@@ -19,3 +19,4 @@ su - vagrant -c 'pipx install pyinstaller' 2>/dev/null || true
 pipx ensurepath --global 2>/dev/null || true
 
 echo "=== [dev-forge : Linux] 20-python: Entorno Python configurado con éxito ==="
+

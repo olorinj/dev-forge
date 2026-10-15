@@ -9,3 +9,4 @@ if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "=== [dev-forge : Windows] 40-go: Go $(go version) configurado ===" -ForegroundColor Green
+

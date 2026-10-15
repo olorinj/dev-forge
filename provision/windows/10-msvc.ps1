@@ -18,3 +18,4 @@ if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "=== [dev-forge : Windows] 10-msvc: Entorno C++ MSVC verificado ===" -ForegroundColor Green
+

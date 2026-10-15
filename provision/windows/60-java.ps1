@@ -8,3 +8,4 @@ if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "=== [dev-forge : Windows] 60-java: Java y Gradle configurados ===" -ForegroundColor Green
+

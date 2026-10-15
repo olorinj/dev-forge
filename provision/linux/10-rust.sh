@@ -33,3 +33,4 @@ cp /home/vagrant/.cargo/config.toml /root/.cargo/config.toml
 chown -R vagrant:vagrant /home/vagrant/.cargo
 
 echo "=== [dev-forge : Linux] 10-rust: Toolchain de Rust configurado con éxito ==="
+

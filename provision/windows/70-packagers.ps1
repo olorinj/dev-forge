@@ -7,3 +7,4 @@ Write-Host "=== [dev-forge : Windows] 70-packagers: Instalando WiX Toolset e Inn
 choco install -y wixtoolset innosetup
 
 Write-Host "=== [dev-forge : Windows] 70-packagers: Empaquetadores nativos Windows listos ===" -ForegroundColor Green
+

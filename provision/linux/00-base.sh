@@ -20,3 +20,4 @@ if ! mountpoint -q /vagrant; then
 fi
 
 echo "=== [dev-forge : Linux] 00-base: Paquetes esenciales configurados con éxito ==="
+
