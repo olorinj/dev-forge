@@ -1,0 +1,52 @@
+# ==============================================================================
+# dev-forge - Git Ignore Rules
+# ==============================================================================
+
+# Entorno de Virtualización y Vagrant
+.vagrant/
+.vagrant.d/
+*.vdi
+*.vmdk
+*.box
+*.log
+vbox*.log
+
+# Artefactos y Salidas de Compilación
+dist/
+build/
+target/
+releases/
+*.tar.gz
+*.zip
+*.dmg
+*.pkg
+*.app/
+*.msi
+*.exe
+*.apk
+*.aab
+
+# Caches de Lenguajes y Entornos
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.gradle/
+.cargo/
+Cargo.lock
+
+# Archivos Temporales y del Sistema Operativo
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Configuración de Editores / IDEs
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

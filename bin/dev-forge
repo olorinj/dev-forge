@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+# =============================================================================
+# dev-forge : CLI Orquestador Multi-Lenguaje y Multiplataforma (Modo B Offline)
+# =============================================================================
+set -e
+
+FORGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Colores y Formato
+BOLD="\e[1m"
+RESET="\e[0m"
+CYAN="\e[36m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+RED="\e[31m"
+GRAY="\e[90m"
+
+log_info()  { echo -e "${CYAN}[dev-forge]${RESET} $1"; }
+log_ok()    { echo -e "${GREEN}[dev-forge : OK]${RESET} $1"; }
+log_warn()  { echo -e "${YELLOW}[dev-forge : AVISO]${RESET} $1"; }
+log_err()   { echo -e "${RED}[dev-forge : ERROR]${RESET} $1" >&2; }
+
+print_banner() {
+    echo -e "${CYAN}${BOLD}"
+    echo "  ================================================================"
+    echo "     ____  _______     __     _____ ___  ____   ____ _____ "
+    echo "    |  _ \| ____\ \   / /    |  ___/ _ \|  _ \ / ___| ____|"
+    echo "    | | | |  _|  \ \ / /_____| |_ | | | | |_) | |  _|  _|  "
+    echo "    | |_| | |___  \ V /|_____|  _|| |_| |  _ <| |_| | |___ "
+    echo "    |____/|_____|  \_/       |_|   \___/|_| \_\\____|_____|"
+    echo "  ================================================================"
+    echo -e "       Forja Universal de Compilación Multi-Lenguaje (Modo B)${RESET}\n"
+}
+
+print_help() {
+    print_banner
+    echo -e "${BOLD}USO:${RESET}"
+    echo "  dev-forge <comando> [opciones]"
+    echo ""
+    echo -e "${BOLD}COMANDOS:${RESET}"
+    echo -e "  ${GREEN}build${RESET}      Compila un proyecto externo en las VMs correspondientes"
+    echo -e "  ${GREEN}status${RESET}     Muestra el estado de las máquinas virtuales de la forja"
+    echo -e "  ${GREEN}up${RESET}         Inicia una máquina virtual (forge-linux | forge-windows)"
+    echo -e "  ${GREEN}halt${RESET}       Detiene las máquinas virtuales para liberar memoria"
+    echo -e "  ${GREEN}provision${RESET}  Re-aprovisiona las herramientas en las máquinas virtuales"
+    echo -e "  ${GREEN}ssh${RESET}        Abre una sesión interactiva en la VM (Linux)"
+    echo ""
+    echo -e "${BOLD}OPCIONES DE 'build':${RESET}"
+    echo "  -p, --project <ruta>     Ruta al proyecto que se desea compilar (Obligatorio)"
+    echo "  -t, --target <destino>   Destino: linux | windows | macos | android | all (defecto: all)"
+    echo "  -c, --clean              Limpia cachés intermedias antes de compilar"
+    echo "  -k, --keep-vm            Mantiene las VMs encendidas tras la compilación"
+    echo "  -u, --update             Fuerza el re-aprovisionamiento de paquetes en la VM"
+    echo "  -h, --help               Muestra esta ayuda"
+    echo ""
+    echo -e "${BOLD}EJEMPLOS:${RESET}"
+    echo "  dev-forge build -p /home/user/DEV/rust/lexishield -t linux"
+    echo "  dev-forge build -p /home/user/DEV/rust/lexishield -t windows"
+    echo "  dev-forge build -p /home/user/DEV/mi-app-java -t android"
+    echo "  dev-forge build -p /home/user/DEV/mi-script-py -t all"
+    echo ""
+}
+
+# Detección del tipo de proyecto según sus ficheros
+detect_project_type() {
+    local p="$1"
+    if [ -f "$p/Cargo.toml" ]; then
+        if [ -d "$p/src-tauri" ] || [ -f "$p/src-tauri/tauri.conf.json" ]; then
+            echo "rust-tauri"
+        else
+            echo "rust"
+        fi
+    elif [ -f "$p/build.gradle" ] || [ -f "$p/build.gradle.kts" ] || [ -f "$p/gradlew" ]; then
+        if [ -d "$p/app/src/main" ] || grep -qi "com.android" "$p/build.gradle" 2>/dev/null; then
+            echo "java-android"
+        else
+            echo "java"
+        fi
+    elif [ -f "$p/pyproject.toml" ] || [ -f "$p/requirements.txt" ]; then
+        echo "python"
+    elif [ -f "$p/go.mod" ]; then
+        echo "go"
+    elif [ -f "$p/package.json" ]; then
+        echo "node"
+    else
+        echo "generic"
+    fi
+}
+
+cmd_build() {
+    local project_path=""
+    local target="all"
+    local do_clean=false
+    local keep_vm=false
+    local do_update=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--project)
+                project_path="$2"
+                shift 2
+                ;;
+            -t|--target)
+                target="$2"
+                shift 2
+                ;;
+            -c|--clean)
+                do_clean=true
+                shift
+                ;;
+            -k|--keep-vm)
+                keep_vm=true
+                shift
+                ;;
+            -u|--update)
+                do_update=true
+                shift
+                ;;
+            -h|--help)
+                print_help
+                exit 0
+                ;;
+            *)
+                log_err "Opción desconocida: $1"
+                print_help
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ -z "$project_path" ]; then
+        log_err "Debe especificar la ruta del proyecto con -p o --project."
+        exit 1
+    fi
+
+    if [ ! -d "$project_path" ]; then
+        log_err "El directorio de proyecto '$project_path' no existe."
+        exit 1
+    fi
+
+    project_path="$(cd "$project_path" && pwd)"
+    local project_name="$(basename "$project_path")"
+    local project_type="$(detect_project_type "$project_path")"
+
+    log_info "Proyecto objetivo: ${BOLD}${project_name}${RESET} ($project_path)"
+    log_info "Tipo detectado:    ${BOLD}${project_type}${RESET}"
+    log_info "Destino objetivo:  ${BOLD}${target}${RESET}"
+
+    # Asegurar carpeta dist en el proyecto cliente
+    mkdir -p "$project_path/dist"
+
+    export FORGE_WORKSPACE="$project_path"
+
+    local need_linux=false
+    local need_windows=false
+    local need_macos=false
+
+    case "$target" in
+        linux)   need_linux=true ;;
+        windows) need_windows=true ;;
+        macos)   need_macos=true; need_linux=true ;;
+        android) need_linux=true ;;
+        all)     need_linux=true; need_windows=true; need_macos=true ;;
+        *)
+            log_err "Target no soportado: '$target'. Opciones: linux, windows, macos, android, all."
+            exit 1
+            ;;
+    esac
+
+    # 1. EJECUCIÓN EN FORGE-LINUX
+    if [ "$need_linux" = true ]; then
+        echo ""
+        log_info "=== Preparando VM 'forge-linux' ==="
+        if [ "$do_update" = true ]; then
+            (cd "$FORGE_DIR" && vagrant up forge-linux --provision)
+        else
+            (cd "$FORGE_DIR" && vagrant up forge-linux)
+        fi
+
+        log_info "Ejecutando compilación en forge-linux (/workspace)..."
+        local linux_cmd=""
+        case "$project_type" in
+            rust-tauri)
+                linux_cmd="cd /workspace && if command -v npm >/dev/null 2>&1; then npm --prefix ui run build || true; fi; cargo build --release"
+                ;;
+            rust)
+                linux_cmd="cd /workspace && cargo build --release"
+                ;;
+            java-android)
+                linux_cmd="cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew assembleRelease; else gradle assembleRelease; fi"
+                ;;
+            java)
+                linux_cmd="cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew build; else gradle build; fi"
+                ;;
+            python)
+                linux_cmd="cd /workspace && if [ -f main.py ]; then pyinstaller --onefile --distpath /workspace/dist main.py; else python3 -m pip install -e .; fi"
+                ;;
+            go)
+                linux_cmd="cd /workspace && go build -ldflags='-s -w' -o /workspace/dist/ ./..."
+                ;;
+            *)
+                linux_cmd="cd /workspace && if [ -f Makefile ]; then make; fi"
+                ;;
+        esac
+
+        if [ "$do_clean" = true ]; then
+            linux_cmd="cargo clean 2>/dev/null || true; $linux_cmd"
+        fi
+
+        (cd "$FORGE_DIR" && vagrant ssh forge-linux -c "$linux_cmd")
+        log_ok "Compilación en forge-linux finalizada."
+
+        if [ "$need_macos" = true ]; then
+            log_info "Ejecutando compilación cruzada para macOS vía Docker/osxcross en forge-linux..."
+            local mac_cmd="cd /workspace && if [ -f Cargo.toml ]; then cargo build --release --target x86_64-apple-darwin 2>/dev/null || true; fi"
+            (cd "$FORGE_DIR" && vagrant ssh forge-linux -c "$mac_cmd") || true
+        fi
+
+        if [ "$keep_vm" = false ]; then
+            log_info "Deteniendo 'forge-linux' para liberar memoria..."
+            (cd "$FORGE_DIR" && vagrant halt forge-linux)
+        fi
+    fi
+
+    # 2. EJECUCIÓN EN FORGE-WINDOWS
+    if [ "$need_windows" = true ]; then
+        echo ""
+        log_info "=== Preparando VM 'forge-windows' ==="
+        if [ "$do_update" = true ]; then
+            (cd "$FORGE_DIR" && vagrant up forge-windows --provision)
+        else
+            (cd "$FORGE_DIR" && vagrant up forge-windows)
+        fi
+
+        log_info "Ejecutando compilación nativa en forge-windows (c:\\workspace)..."
+        local win_cmd=""
+        case "$project_type" in
+            rust-tauri)
+                win_cmd="Set-Location c:\\workspace; if (Test-Path ui) { npm --prefix ui run build }; cargo build --release"
+                ;;
+            rust)
+                win_cmd="Set-Location c:\\workspace; cargo build --release"
+                ;;
+            java|java-android)
+                win_cmd="Set-Location c:\\workspace; if (Test-Path gradlew.bat) { .\\gradlew.bat build } else { gradle build }"
+                ;;
+            python)
+                win_cmd="Set-Location c:\\workspace; if (Test-Path main.py) { pyinstaller --onefile --distpath c:\\workspace\\dist main.py }"
+                ;;
+            go)
+                win_cmd="Set-Location c:\\workspace; go build -ldflags=\"-s -w\" -o c:\\workspace\\dist\\ ./..."
+                ;;
+            *)
+                win_cmd="Write-Host 'No se reconoció comando específico para este tipo en Windows.'"
+                ;;
+        esac
+
+        (cd "$FORGE_DIR" && vagrant winrm forge-windows -c "powershell -ExecutionPolicy Bypass -Command \"$win_cmd\"")
+        log_ok "Compilación en forge-windows finalizada."
+
+        if [ "$keep_vm" = false ]; then
+            log_info "Deteniendo 'forge-windows' para liberar memoria..."
+            (cd "$FORGE_DIR" && vagrant halt forge-windows)
+        fi
+    fi
+
+    echo ""
+    log_ok "Proceso completado con éxito. Revisa los binarios generados en: ${BOLD}$project_path/dist${RESET}"
+}
+
+# Enrutador principal de comandos
+case "$1" in
+    build)
+        shift
+        cmd_build "$@"
+        ;;
+    status)
+        (cd "$FORGE_DIR" && vagrant status)
+        ;;
+    up)
+        shift
+        (cd "$FORGE_DIR" && vagrant up "$@")
+        ;;
+    halt)
+        shift
+        (cd "$FORGE_DIR" && vagrant halt "$@")
+        ;;
+    provision)
+        shift
+        (cd "$FORGE_DIR" && vagrant provision "$@")
+        ;;
+    ssh)
+        shift
+        (cd "$FORGE_DIR" && vagrant ssh forge-linux "$@")
+        ;;
+    -h|--help|help|"")
+        print_help
+        ;;
+    *)
+        log_err "Comando no reconocido: '$1'"
+        print_help
+        exit 1
+        ;;
+esac

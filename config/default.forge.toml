@@ -1,0 +1,48 @@
+# ==============================================================================
+# dev-forge : Configuración General por Defecto
+# ==============================================================================
+
+[forge]
+version = "1.0.0"
+mode = "offline" # "offline" (Modo B local) | "runner" (Modo A self-hosted)
+
+[virtualbox]
+gui_enabled = false
+keep_vms_running = false
+
+[linux]
+name = "forge-linux"
+box = "bento/debian-12"
+cpus = 4
+memory_mb = 4096
+
+[windows]
+name = "forge-windows"
+box = "gusztavvargadr/visual-studio-2022-community-windows-11"
+cpus = 4
+memory_mb = 8192
+winrm_max_memory_mb = 8192
+
+[targets]
+default_target = "all"
+output_dir = "dist"
+
+[languages.rust]
+default_profile = "release"
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin"
+]
+
+[languages.java]
+jdk_version = "21"
+build_tool = "gradle" # "gradle" | "maven"
+
+[languages.python]
+python_version = "3.12"
+bundler = "pyinstaller"
+
+[languages.go]
+go_version = "1.23.2"
+strip_binaries = true
