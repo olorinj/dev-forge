@@ -100,3 +100,4 @@ Para consultar detalles de implementación, diagramas de arquitectura interna o 
 ## 📄 Licencia
 
 Este proyecto está licenciado bajo los estándares internos del ecosistema de desarrollo de software.
+

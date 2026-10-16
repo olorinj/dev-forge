@@ -50,3 +50,4 @@ El mayor obstáculo en macOS es **Apple Gatekeeper**: el sistema operativo bloqu
 `dev-forge` incluye la herramienta `rcodesign` (desarrollada por Gregory Szorc):
 - Permite firmar binarios Mach-O, bundles `.app` y archivos `.dmg` usando certificados criptográficos de Apple Developer (`.p12`).
 - Permite **comunicarse con las APIs de Notarización de Apple directamente desde Linux** mediante credenciales de App Store Connect, obteniendo el *ticket* de aprobación de Apple sin tocar un Mac.
+

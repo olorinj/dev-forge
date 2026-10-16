@@ -181,10 +181,10 @@ cmd_build() {
         local linux_cmd=""
         case "$project_type" in
             rust-tauri)
-                linux_cmd="cd /workspace && if command -v npm >/dev/null 2>&1; then npm --prefix ui run build || true; fi; cargo build --release"
+                linux_cmd="cd /workspace && export CARGO_TARGET_DIR=/tmp/cargo-target && if command -v npm >/dev/null 2>&1; then npm --prefix ui run build || true; fi && cargo build --release && mkdir -p /workspace/dist && find /tmp/cargo-target/release -maxdepth 1 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.d' -exec cp -f {} /workspace/dist/ \;"
                 ;;
             rust)
-                linux_cmd="cd /workspace && cargo build --release"
+                linux_cmd="cd /workspace && export CARGO_TARGET_DIR=/tmp/cargo-target && cargo build --release && mkdir -p /workspace/dist && find /tmp/cargo-target/release -maxdepth 1 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.d' -exec cp -f {} /workspace/dist/ \;"
                 ;;
             java-android)
                 linux_cmd="cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew assembleRelease; else gradle assembleRelease; fi"
@@ -204,7 +204,7 @@ cmd_build() {
         esac
 
         if [ "$do_clean" = true ]; then
-            linux_cmd="cargo clean 2>/dev/null || true; $linux_cmd"
+            linux_cmd="rm -rf /tmp/cargo-target /workspace/target 2>/dev/null || true; cargo clean 2>/dev/null || true; $linux_cmd"
         fi
 
         (cd "$FORGE_DIR" && vagrant ssh forge-linux -c "$linux_cmd")
@@ -212,7 +212,7 @@ cmd_build() {
 
         if [ "$need_macos" = true ]; then
             log_info "Ejecutando compilación cruzada para macOS vía Docker/osxcross en forge-linux..."
-            local mac_cmd="cd /workspace && if [ -f Cargo.toml ]; then cargo build --release --target x86_64-apple-darwin 2>/dev/null || true; fi"
+            local mac_cmd="cd /workspace && if [ -f Cargo.toml ]; then export CARGO_TARGET_DIR=/tmp/cargo-target && cargo build --release --target x86_64-apple-darwin 2>/dev/null && mkdir -p /workspace/dist && find /tmp/cargo-target/x86_64-apple-darwin/release -maxdepth 1 -type f ! -name '*.d' ! -name '*.rlib' -exec cp -f {} /workspace/dist/ \; || true; fi"
             (cd "$FORGE_DIR" && vagrant ssh forge-linux -c "$mac_cmd") || true
         fi
 
@@ -236,10 +236,10 @@ cmd_build() {
         local win_cmd=""
         case "$project_type" in
             rust-tauri)
-                win_cmd="Set-Location c:\\workspace; if (Test-Path ui) { npm --prefix ui run build }; cargo build --release"
+                win_cmd="Set-Location c:\\workspace; \$env:CARGO_TARGET_DIR='c:\\target'; if (Test-Path ui) { npm --prefix ui run build }; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
                 ;;
             rust)
-                win_cmd="Set-Location c:\\workspace; cargo build --release"
+                win_cmd="Set-Location c:\\workspace; \$env:CARGO_TARGET_DIR='c:\\target'; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
                 ;;
             java|java-android)
                 win_cmd="Set-Location c:\\workspace; if (Test-Path gradlew.bat) { .\\gradlew.bat build } else { gradle build }"
@@ -254,6 +254,10 @@ cmd_build() {
                 win_cmd="Write-Host 'No se reconoció comando específico para este tipo en Windows.'"
                 ;;
         esac
+
+        if [ "$do_clean" = true ]; then
+            win_cmd="if (Test-Path c:\\target) { Remove-Item -Recurse -Force c:\\target -ErrorAction SilentlyContinue }; if (Test-Path c:\\workspace\\target) { Remove-Item -Recurse -Force c:\\workspace\\target -ErrorAction SilentlyContinue }; $win_cmd"
+        fi
 
         (cd "$FORGE_DIR" && vagrant winrm forge-windows -c "powershell -ExecutionPolicy Bypass -Command \"$win_cmd\"")
         log_ok "Compilación en forge-windows finalizada."
@@ -302,3 +306,4 @@ case "$1" in
         exit 1
         ;;
 esac
+

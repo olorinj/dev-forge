@@ -46,3 +46,4 @@ bundler = "pyinstaller"
 [languages.go]
 go_version = "1.23.2"
 strip_binaries = true
+
