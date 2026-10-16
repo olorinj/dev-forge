@@ -1,4 +1,4 @@
-﻿﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "=== [dev-forge : Windows] 00-base: Configurando entorno base y Chocolatey ===" -ForegroundColor Cyan
