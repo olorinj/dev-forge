@@ -96,6 +96,12 @@ cmd_build() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            provision)
+                log_info "Detectado comando 'provision'. Re-aprovisionando las máquinas virtuales de la forja..."
+                shift
+                (cd "$FORGE_DIR" && vagrant provision "$@")
+                return 0
+                ;;
             -p|--project)
                 project_path="$2"
                 shift 2
