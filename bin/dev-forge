@@ -267,10 +267,10 @@ cmd_build() {
         local win_cmd=""
         case "$project_type" in
             rust-tauri)
-                win_cmd="Set-Location c:\\workspace; \$env:CARGO_TARGET_DIR='c:\\target'; if (Test-Path ui\\package.json) { npm --prefix ui run build } elseif (Test-Path package.json) { npm run build }; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
+                win_cmd="Set-Location c:\\workspace; [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', 'c:\\target'); if (Test-Path ui\\package.json) { if (-not (Test-Path ui\\node_modules\\.bin\\vite.cmd)) { npm --prefix ui install }; npm --prefix ui run build } elseif (Test-Path package.json) { if (-not (Test-Path node_modules)) { npm install }; npm run build }; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
                 ;;
             rust)
-                win_cmd="Set-Location c:\\workspace; \$env:CARGO_TARGET_DIR='c:\\target'; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
+                win_cmd="Set-Location c:\\workspace; [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', 'c:\\target'); cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
                 ;;
             java|java-android)
                 win_cmd="Set-Location c:\\workspace; if (Test-Path gradlew.bat) { .\\gradlew.bat build } else { gradle build }"
