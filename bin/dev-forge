@@ -210,11 +210,9 @@ cmd_build() {
         local linux_cmd=""
         case "$project_type" in
             rust-tauri)
-                linux_cmd="cd /workspace && if command -v npm >/dev/null 2>&1; then npm --prefix ui run build || true; fi; cargo build --release"
-                linux_cmd="cd /workspace && export CARGO_TARGET_DIR=/tmp/cargo-target && if command -v npm >/dev/null 2>&1; then npm --prefix ui run build || true; fi && cargo build --release && mkdir -p /workspace/dist && find /tmp/cargo-target/release -maxdepth 1 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.d' -exec cp -f {} /workspace/dist/ \;"
+                linux_cmd="cd /workspace && export CARGO_TARGET_DIR=/tmp/cargo-target && if [ -f ui/package.json ]; then npm --prefix ui run build; elif [ -f package.json ]; then npm run build; fi && cargo build --release && mkdir -p /workspace/dist && find /tmp/cargo-target/release -maxdepth 1 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.d' -exec cp -f {} /workspace/dist/ \;"
                 ;;
             rust)
-                linux_cmd="cd /workspace && cargo build --release"
                 linux_cmd="cd /workspace && export CARGO_TARGET_DIR=/tmp/cargo-target && cargo build --release && mkdir -p /workspace/dist && find /tmp/cargo-target/release -maxdepth 1 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.d' -exec cp -f {} /workspace/dist/ \;"
                 ;;
             java-android)
@@ -269,11 +267,9 @@ cmd_build() {
         local win_cmd=""
         case "$project_type" in
             rust-tauri)
-                win_cmd="Set-Location c:\\workspace; if (Test-Path ui) { npm --prefix ui run build }; cargo build --release"
-                win_cmd="Set-Location c:\\workspace; \$env:CARGO_TARGET_DIR='c:\\target'; if (Test-Path ui) { npm --prefix ui run build }; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
+                win_cmd="Set-Location c:\\workspace; \$env:CARGO_TARGET_DIR='c:\\target'; if (Test-Path ui\\package.json) { npm --prefix ui run build } elseif (Test-Path package.json) { npm run build }; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
                 ;;
             rust)
-                win_cmd="Set-Location c:\\workspace; cargo build --release"
                 win_cmd="Set-Location c:\\workspace; \$env:CARGO_TARGET_DIR='c:\\target'; cargo build --release; if (Test-Path c:\\target\\release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem c:\\target\\release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem c:\\target\\release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force }"
                 ;;
             java|java-android)
@@ -305,6 +301,25 @@ cmd_build() {
 
     echo ""
     log_ok "Proceso completado con éxito. Revisa los binarios generados en: ${BOLD}$project_path/dist${RESET}"
+    if [ -d "$project_path/dist" ]; then
+        local count=0
+        for f in "$project_path/dist"/*; do
+            if [ -f "$f" ]; then
+                ((count++))
+            fi
+        done
+        if [ "$count" -gt 0 ]; then
+            echo -e "\n  ${CYAN}${BOLD}Artefactos en dist/ ($count):${RESET}"
+            for f in "$project_path/dist"/*; do
+                if [ -f "$f" ]; then
+                    local fname="$(basename "$f")"
+                    local fsize="$(ls -lh "$f" | awk '{print $5}')"
+                    printf "   ${GREEN}✔${RESET} %-40s ${GRAY}(%s)${RESET}\n" "$fname" "$fsize"
+                fi
+            done
+            echo ""
+        fi
+    fi
 }
 
 # Enrutador principal de comandos
