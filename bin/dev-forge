@@ -87,6 +87,30 @@ detect_project_type() {
     fi
 }
 
+cmd_provision() {
+    local targets=("$@")
+    if [ ${#targets[@]} -eq 0 ]; then
+        targets=("forge-linux")
+    elif [ "${targets[0]}" = "all" ]; then
+        targets=("forge-linux" "forge-windows")
+    fi
+
+    for target in "${targets[@]}"; do
+        local is_running=false
+        if (cd "$FORGE_DIR" && vagrant status "$target" 2>/dev/null | grep -q "running"); then
+            is_running=true
+        fi
+
+        if [ "$is_running" = true ]; then
+            log_info "La máquina '$target' está encendida. Ejecutando reaprovisionamiento..."
+            (cd "$FORGE_DIR" && vagrant provision "$target")
+        else
+            log_info "La máquina '$target' está apagada o no iniciada. Iniciando y aprovisionando automáticamente..."
+            (cd "$FORGE_DIR" && vagrant up "$target" --provision)
+        fi
+    done
+}
+
 cmd_build() {
     local project_path=""
     local target="all"
@@ -97,9 +121,8 @@ cmd_build() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             provision)
-                log_info "Detectado comando 'provision'. Re-aprovisionando las máquinas virtuales de la forja..."
                 shift
-                (cd "$FORGE_DIR" && vagrant provision "$@")
+                cmd_provision "$@"
                 return 0
                 ;;
             -p|--project)
@@ -303,7 +326,7 @@ case "$1" in
         ;;
     provision)
         shift
-        (cd "$FORGE_DIR" && vagrant provision "$@")
+        cmd_provision "$@"
         ;;
     ssh)
         shift
