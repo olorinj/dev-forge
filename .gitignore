@@ -48,6 +48,7 @@ Thumbs.db
 # Configuración de Editores / IDEs
 .idea/
 .vscode/
+*.code-workspace
 *.sublime-project
 *.sublime-workspace
 

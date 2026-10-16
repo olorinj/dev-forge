@@ -6,20 +6,20 @@ export DEBIAN_FRONTEND=noninteractive
 echo "=== [dev-forge : Linux] 50-java-android: Configurando repositorio de OpenJDK 21 LTS ==="
 
 # 1. Configurar repositorio oficial de Adoptium (Eclipse Temurin) para Debian 12 (Bookworm)
+apt-get install -y --no-install-recommends gnupg curl ca-certificates
 mkdir -p /etc/apt/keyrings
-if curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public 2>/dev/null | gpg --dearmor --yes -o /etc/apt/keyrings/adoptium.gpg 2>/dev/null; then
-  echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" > /etc/apt/sources.list.d/adoptium.list
-fi
+curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor --yes -o /etc/apt/keyrings/adoptium.gpg
+echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" > /etc/apt/sources.list.d/adoptium.list
 
 # 2. Configurar repositorio Debian bookworm-backports como respaldo secundario
 echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list
 
 apt-get update
 
-# 3. Instalación de Java 21 (Temurin 21 o OpenJDK 21 backports)
-if apt-get install -y --no-install-recommends temurin-21-jdk 2>/dev/null; then
+# 3. Instalación de Java 21 (Temurin 21 o OpenJDK 21 backports o default-jdk)
+if apt-get install -y --no-install-recommends temurin-21-jdk; then
   echo "Eclipse Temurin 21 JDK instalado con éxito."
-elif apt-get install -y --no-install-recommends -t bookworm-backports openjdk-21-jdk 2>/dev/null; then
+elif apt-get install -y --no-install-recommends -t bookworm-backports openjdk-21-jdk; then
   echo "OpenJDK 21 (backports) instalado con éxito."
 else
   echo "Instalando JDK por defecto del sistema..."

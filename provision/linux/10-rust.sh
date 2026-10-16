@@ -16,6 +16,7 @@ for target in $TARGETS; do
   su - vagrant -c "rustup target add $target" 2>/dev/null || true
 done
 
+# Exportar PATH de Cargo globalmente
 # Exportar PATH y CARGO_TARGET_DIR globalmente
 echo 'export PATH="/home/vagrant/.cargo/bin:/root/.cargo/bin:$PATH"' > /etc/profile.d/rust.sh
 echo 'export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/tmp/cargo-target}"' >> /etc/profile.d/rust.sh
