@@ -57,7 +57,7 @@ function Detect-ProjectType {
         }
         return "java"
     }
-    if ((Test-Path (Join-Path $Path "pyproject.toml")) -or (Test-Path (Join-Path $Path "requirements.txt"))) {
+    if ((Test-Path (Join-Path $Path "pyproject.toml")) -or (Test-Path (Join-Path $Path "requirements.txt")) -or (Test-Path (Join-Path $Path "main.py"))) {
         return "python"
     }
     if (Test-Path (Join-Path $Path "go.mod")) {
@@ -65,6 +65,9 @@ function Detect-ProjectType {
     }
     if (Test-Path (Join-Path $Path "package.json")) {
         return "node"
+    }
+    if ((Test-Path (Join-Path $Path "CMakeLists.txt")) -or (Test-Path (Join-Path $Path "Makefile"))) {
+        return "c-cpp"
     }
     return "generic"
 }
@@ -207,10 +210,15 @@ function Invoke-Build {
                     $linuxCmd = "cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew build; else gradle build; fi"
                 }
                 "python" {
-                    $linuxCmd = "cd /workspace && if [ -f main.py ]; then pyinstaller --onefile --distpath /workspace/dist main.py; else python3 -m pip install -e .; fi"
+                    $pyName = if ($projectName -eq "python") { "hashforge-py" } else { $projectName }
+                    $linuxCmd = "cd /workspace && if [ -f main.py ]; then pyinstaller --onefile --name '$pyName' --distpath /workspace/dist main.py; else python3 -m pip install -e .; fi"
                 }
                 "go" {
-                    $linuxCmd = "cd /workspace && go build -ldflags='-s -w' -o /workspace/dist/ ./..."
+                    $goName = if ($projectName -eq "go") { "hashforge-go" } else { $projectName }
+                    $linuxCmd = "cd /workspace && mkdir -p /workspace/dist && go build -ldflags='-s -w' -o '/workspace/dist/$goName' ./"
+                }
+                "c-cpp" {
+                    $linuxCmd = "cd /workspace && if [ -f CMakeLists.txt ]; then cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && mkdir -p /workspace/dist && find build -maxdepth 2 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.sh' ! -name '*.txt' ! -name '*.cmake' -exec cp -f {} /workspace/dist/ \;; elif [ -f Makefile ]; then make && mkdir -p /workspace/dist && find . -maxdepth 1 -type f -executable ! -name '*.sh' -exec cp -f {} /workspace/dist/ \;; fi"
                 }
                 default {
                     $linuxCmd = "cd /workspace && if [ -f Makefile ]; then make; fi"
@@ -264,10 +272,15 @@ function Invoke-Build {
                     $winCmd = "Set-Location c:\workspace; if (Test-Path gradlew.bat) { .\gradlew.bat build } else { gradle build }"
                 }
                 "python" {
-                    $winCmd = "Set-Location c:\workspace; if (Test-Path main.py) { pyinstaller --onefile --distpath c:\workspace\dist main.py }"
+                    $pyName = if ($projectName -eq "python") { "hashforge-py" } else { $projectName }
+                    $winCmd = "Set-Location c:\workspace; if (Test-Path main.py) { pyinstaller --onefile --name '$pyName' --distpath c:\workspace\dist main.py }"
                 }
                 "go" {
-                    $winCmd = "Set-Location c:\workspace; go build -ldflags=""-s -w"" -o c:\workspace\dist\ ./..."
+                    $goName = if ($projectName -eq "go") { "hashforge-go" } else { $projectName }
+                    $winCmd = "Set-Location c:\workspace; New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; go build -ldflags=""-s -w"" -o c:\workspace\dist\$goName.exe ./"
+                }
+                "c-cpp" {
+                    $winCmd = "Set-Location c:\workspace; if (Test-Path CMakeLists.txt) { cmake -B build; cmake --build build --config Release; if (Test-Path build\Release) { New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; Get-ChildItem build\Release -Filter *.exe | Copy-Item -Destination c:\workspace\dist\ -Force; Get-ChildItem build\Release -Filter *.dll | Copy-Item -Destination c:\workspace\dist\ -Force } elseif (Test-Path build) { New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; Get-ChildItem build -Filter *.exe | Copy-Item -Destination c:\workspace\dist\ -Force } } elseif (Test-Path Makefile) { nmake }"
                 }
                 default {
                     $winCmd = "Write-Host 'No se reconocio comando especifico para este tipo en Windows.'"

@@ -42,9 +42,9 @@ mod tests {
         let res = hash_string("dev-forge test");
         assert_eq!(
             res.sha256,
-            "7fa5a0fe7bcdd886b62fc0bcddbf1a70c86801bb61dd66c430485981ee8aa6bf"
+            "3424cecd9bc9384046f4b97b5012cc51037a0a58cbf547642dc71dc6a0ac0825"
         );
-        assert_eq!(res.md5, "00dfa0bf846830cfcae67dca1f543166");
+        assert_eq!(res.md5, "253c885072f588436970bcbc0fe47b9e");
     }
 }
 

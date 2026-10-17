@@ -8,7 +8,7 @@ apt-get update
 
 echo "=== [dev-forge : Linux] 00-base: Instalando paquetes esenciales y bibliotecas base ==="
 apt-get install -y --no-install-recommends \
-  curl wget git build-essential pkg-config libssl-dev ca-certificates gnupg \
+  curl wget git cmake build-essential pkg-config libssl-dev ca-certificates gnupg \
   dos2unix jq unzip patchelf file rpm libfuse2 mold clang lld \
   libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 

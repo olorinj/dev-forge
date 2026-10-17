@@ -76,12 +76,14 @@ detect_project_type() {
         else
             echo "java"
         fi
-    elif [ -f "$p/pyproject.toml" ] || [ -f "$p/requirements.txt" ]; then
+    elif [ -f "$p/pyproject.toml" ] || [ -f "$p/requirements.txt" ] || [ -f "$p/main.py" ]; then
         echo "python"
     elif [ -f "$p/go.mod" ]; then
         echo "go"
     elif [ -f "$p/package.json" ]; then
         echo "node"
+    elif [ -f "$p/CMakeLists.txt" ] || [ -f "$p/Makefile" ]; then
+        echo "c-cpp"
     else
         echo "generic"
     fi
@@ -230,7 +232,11 @@ cmd_build() {
         fi
 
         log_info "Ejecutando compilación en forge-linux (/workspace)..."
-        local linux_cmd=""
+        local py_name="$project_name"
+        [ "$project_name" = "python" ] && py_name="hashforge-py"
+        local go_name="$project_name"
+        [ "$project_name" = "go" ] && go_name="hashforge-go"
+
         case "$project_type" in
             rust-tauri)
                 linux_cmd="cd /workspace && export CARGO_TARGET_DIR=/tmp/cargo-target && if [ -f ui/package.json ]; then npm --prefix ui run build; elif [ -f package.json ]; then npm run build; fi && cargo build --release && mkdir -p /workspace/dist && find /tmp/cargo-target/release -maxdepth 1 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.d' -exec cp -f {} /workspace/dist/ \;"
@@ -245,10 +251,13 @@ cmd_build() {
                 linux_cmd="cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew build; else gradle build; fi"
                 ;;
             python)
-                linux_cmd="cd /workspace && if [ -f main.py ]; then pyinstaller --onefile --distpath /workspace/dist main.py; else python3 -m pip install -e .; fi"
+                linux_cmd="cd /workspace && if [ -f main.py ]; then pyinstaller --onefile --name \"$py_name\" --distpath /workspace/dist main.py; else python3 -m pip install -e .; fi"
                 ;;
             go)
-                linux_cmd="cd /workspace && go build -ldflags='-s -w' -o /workspace/dist/ ./..."
+                linux_cmd="cd /workspace && mkdir -p /workspace/dist && go build -ldflags='-s -w' -o \"/workspace/dist/$go_name\" ./"
+                ;;
+            c-cpp)
+                linux_cmd="cd /workspace && if [ -f CMakeLists.txt ]; then cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && mkdir -p /workspace/dist && find build -maxdepth 2 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.sh' ! -name '*.txt' ! -name '*.cmake' -exec cp -f {} /workspace/dist/ \;; elif [ -f Makefile ]; then make && mkdir -p /workspace/dist && find . -maxdepth 1 -type f -executable ! -name '*.sh' -exec cp -f {} /workspace/dist/ \;; fi"
                 ;;
             *)
                 linux_cmd="cd /workspace && if [ -f Makefile ]; then make; fi"
@@ -287,6 +296,11 @@ cmd_build() {
         fi
 
         log_info "Ejecutando compilación nativa en forge-windows (c:\\workspace)..."
+        local py_name="$project_name"
+        [ "$project_name" = "python" ] && py_name="hashforge-py"
+        local go_name="$project_name"
+        [ "$project_name" = "go" ] && go_name="hashforge-go"
+
         local win_cmd=""
         case "$project_type" in
             rust-tauri)
@@ -299,10 +313,13 @@ cmd_build() {
                 win_cmd="Set-Location c:\\workspace; if (Test-Path gradlew.bat) { .\\gradlew.bat build } else { gradle build }"
                 ;;
             python)
-                win_cmd="Set-Location c:\\workspace; if (Test-Path main.py) { pyinstaller --onefile --distpath c:\\workspace\\dist main.py }"
+                win_cmd="Set-Location c:\\workspace; if (Test-Path main.py) { pyinstaller --onefile --name '$py_name' --distpath c:\\workspace\\dist main.py }"
                 ;;
             go)
-                win_cmd="Set-Location c:\\workspace; go build -ldflags=\"-s -w\" -o c:\\workspace\\dist\\ ./..."
+                win_cmd="Set-Location c:\\workspace; New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; go build -ldflags=\"-s -w\" -o c:\\workspace\\dist\\$go_name.exe ./"
+                ;;
+            c-cpp)
+                win_cmd="Set-Location c:\\workspace; if (Test-Path CMakeLists.txt) { cmake -B build; cmake --build build --config Release; if (Test-Path build\\Release) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem build\\Release -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force; Get-ChildItem build\\Release -Filter *.dll | Copy-Item -Destination c:\\workspace\\dist\\ -Force } elseif (Test-Path build) { New-Item -ItemType Directory -Force -Path c:\\workspace\\dist | Out-Null; Get-ChildItem build -Filter *.exe | Copy-Item -Destination c:\\workspace\\dist\\ -Force } } elseif (Test-Path Makefile) { nmake }"
                 ;;
             *)
                 win_cmd="Write-Host 'No se reconoció comando específico para este tipo en Windows.'"

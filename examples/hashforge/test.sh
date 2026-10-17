@@ -1,79 +1,69 @@
 #!/usr/bin/env bash
 # =============================================================================
-# HashForge - Script de Pruebas de Compilación y Verificación (Linux / Bash)
+# HashForge - Orquestador Maestro de Pruebas Multi-Lenguaje y Multi-VM
 # =============================================================================
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FORGE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-DEV_FORGE="$FORGE_ROOT/bin/dev-forge"
+LANG_ARG="${1:-all}"
+TARGET_ARG="${2:-all}"
 
 GREEN="\e[32m"
 RED="\e[31m"
 CYAN="\e[36m"
-YELLOW="\e[33m"
+BOLD="\e[1m"
 RESET="\e[0m"
 
-log_info() { echo -e "${CYAN}[HashForge Test]${RESET} $1"; }
-log_ok()   { echo -e "${GREEN}[HashForge Test : PASS]${RESET} $1"; }
-log_fail() { echo -e "${RED}[HashForge Test : FAIL]${RESET} $1" >&2; exit 1; }
+echo -e "${CYAN}${BOLD}"
+echo "================================================================="
+echo "   HashForge: Suite Universal de Pruebas Multi-Lenguaje"
+echo "================================================================="
+echo -e "${RESET}"
+echo -e "Lenguaje(s): ${BOLD}${LANG_ARG}${RESET}"
+echo -e "Destino(s):  ${BOLD}${TARGET_ARG}${RESET}"
+echo ""
 
-TARGET="${1:-linux}"
-EXPECTED_SHA256="7fa5a0fe7bcdd886b62fc0bcddbf1a70c86801bb61dd66c430485981ee8aa6bf"
-EXPECTED_MD5="00dfa0bf846830cfcae67dca1f543166"
-
-log_info "Iniciando suite de pruebas para HashForge"
-log_info "Directorio del proyecto: $SCRIPT_DIR"
-log_info "Destino de compilación:   $TARGET"
-
-# 1. Compilación mediante dev-forge
-log_info "Ejecutando orquestador dev-forge..."
-"$DEV_FORGE" build -p "$SCRIPT_DIR" -t "$TARGET" -k
-
-# 2. Verificación de binarios generados
-DIST_DIR="$SCRIPT_DIR/dist"
-if [ ! -d "$DIST_DIR" ]; then
-    log_fail "No se generó el directorio dist/ tras la compilación."
+if [ "$LANG_ARG" = "all" ]; then
+    LANGUAGES=("rust" "python" "c" "cpp" "go")
+else
+    LANGUAGES=("$LANG_ARG")
 fi
 
-if [ "$TARGET" = "linux" ] || [ "$TARGET" = "all" ]; then
-    LINUX_BIN="$DIST_DIR/hashforge"
-    if [ ! -f "$LINUX_BIN" ]; then
-        log_fail "No se encontró el binario Linux en $LINUX_BIN"
-    fi
-    chmod +x "$LINUX_BIN"
+FAILED=0
+PASSED=0
 
-    log_info "Verificando ejecución de binario Linux..."
-    OUTPUT="$("$LINUX_BIN" -s "dev-forge test" -j)"
-    echo "$OUTPUT"
-
-    if echo "$OUTPUT" | grep -q "$EXPECTED_SHA256" && echo "$OUTPUT" | grep -q "$EXPECTED_MD5"; then
-        log_ok "Binario Linux verificado correctamente con hash esperado (SHA-256: $EXPECTED_SHA256)"
-    else
-        log_fail "El binario Linux devolvió un hash incorrecto: $OUTPUT"
-    fi
-fi
-
-if [ "$TARGET" = "windows" ] || [ "$TARGET" = "all" ]; then
-    WIN_BIN="$DIST_DIR/hashforge.exe"
-    if [ ! -f "$WIN_BIN" ]; then
-        log_fail "No se encontró el binario Windows en $WIN_BIN"
+for lang in "${LANGUAGES[@]}"; do
+    SUB_DIR="$SCRIPT_DIR/$lang"
+    if [ ! -d "$SUB_DIR" ]; then
+        echo -e "${RED}[ERROR] Lenguaje '$lang' no encontrado en $SUB_DIR${RESET}"
+        FAILED=$((FAILED + 1))
+        continue
     fi
 
-    log_info "Verificando cabeceras del binario Windows MSVC ($WIN_BIN)..."
-    if command -v file >/dev/null 2>&1; then
-        FILE_INFO="$(file "$WIN_BIN")"
-        echo "  $FILE_INFO"
-        if echo "$FILE_INFO" | grep -qi "PE32"; then
-            log_ok "Binario Windows verificado como ejecutable nativo PE32+ MSVC"
+    echo -e "${CYAN}-----------------------------------------------------------------${RESET}"
+    echo -e "${BOLD}▶ Ejecutando pruebas para: ${lang^^} (Target: $TARGET_ARG)${RESET}"
+    echo -e "${CYAN}-----------------------------------------------------------------${RESET}"
+
+    if [ -f "$SUB_DIR/test.sh" ]; then
+        if bash "$SUB_DIR/test.sh" "$TARGET_ARG"; then
+            echo -e "${GREEN}✔ ${lang^^}: PRUEBAS SUPERADAS${RESET}\n"
+            PASSED=$((PASSED + 1))
         else
-            log_fail "El archivo no parece ser un ejecutable PE32 válido: $FILE_INFO"
+            echo -e "${RED}✘ ${lang^^}: PRUEBAS FALLIDAS${RESET}\n"
+            FAILED=$((FAILED + 1))
         fi
     else
-        log_ok "Binario Windows encontrado con tamaño: $(stat -c %s "$WIN_BIN") bytes"
+        echo -e "${RED}[AVISO] No se encontró test.sh en $SUB_DIR${RESET}\n"
+        FAILED=$((FAILED + 1))
     fi
+done
+
+echo -e "${CYAN}=================================================================${RESET}"
+echo -e "${BOLD}RESUMEN DE PRUEBAS MULTI-LENGUAJE:${RESET}"
+echo -e "  ${GREEN}Superados:${RESET} $PASSED"
+echo -e "  ${RED}Fallidos: ${RESET} $FAILED"
+echo -e "${CYAN}=================================================================${RESET}"
+
+if [ $FAILED -gt 0 ]; then
+    exit 1
 fi
-
-echo ""
-log_ok "Todas las pruebas de HashForge finalizaron con éxito para target '$TARGET'."
-
