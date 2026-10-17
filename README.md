@@ -27,6 +27,7 @@ flowchart LR
   - **Java & Android**: OpenJDK 21 LTS, Gradle y compilación de paquetes móviles APK/AAB.
   - **Python**: Empaquetado en ejecutables independientes con PyInstaller y gestión con UV.
   - **Go**: Binarios estáticos de alto rendimiento.
+  - **C / C++**: GCC, Clang, CMake y MSVC nativo con enlazado criptográfico del sistema.
   - **Node.js**: Entorno LTS y empaquetadores web modernos.
 - **🛡️ Entornos Aislados e Inmutables**:
   - `forge-linux`: Debian 12 optimizado con enlazador ultrarrápido `mold` y Docker para compilación cruzada hacia macOS.

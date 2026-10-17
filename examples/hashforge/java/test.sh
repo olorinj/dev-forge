@@ -41,3 +41,4 @@ if command -v java >/dev/null 2>&1; then
 else
     log_ok "JAR compilado y verificado estructuralmente ($(stat -c %s "$JAR_BIN") bytes)"
 fi
+

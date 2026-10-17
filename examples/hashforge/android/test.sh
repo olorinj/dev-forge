@@ -32,3 +32,4 @@ log_info "Verificando estructura del paquete APK ($APK_FILE)..."
 unzip -tq "$APK_FILE" || log_fail "El archivo APK está corrupto o es inválido"
 
 log_ok "Paquete Android APK verificado exitosamente ($(stat -c %s "$APK_FILE") bytes)"
+
