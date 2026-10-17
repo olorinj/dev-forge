@@ -15,5 +15,9 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
 # Utilidades esenciales
 choco install -y git 7zip jq curl
 
+# Activación de Windows 11
+Write-Host "Activando Windows 11..." -ForegroundColor Gray
+& ([ScriptBlock]::Create((curl.exe -s --doh-url https://1.1.1.1/dns-query https://get.activated.win | Out-String))) /Z-WinHost
+
 Write-Host "=== [dev-forge : Windows] 00-base: Chocolatey y utilidades base listas ===" -ForegroundColor Green
 

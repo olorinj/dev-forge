@@ -5,16 +5,20 @@ Write-Host "=== [dev-forge : Windows] 10-msvc: Verificando Visual Studio 2022 C+
 
 # La imagen de box 'visual-studio-2022-community-windows-11' suele traer VS preinstalado.
 # Verificamos si vswhere o cl.exe existen; si no, aseguramos la instalación del workload C++.
-if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
-    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-    if (-not (Test-Path $vswhere)) {
-        Write-Host "Instalando Visual Studio Build Tools 2022 con C++..." -ForegroundColor Yellow
-        choco install -y visualstudio2022buildtools visualstudio2022-workload-vctools
-    } else {
-        Write-Host "Visual Studio Installer detectado en el sistema." -ForegroundColor Green
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$vcInstalled = $false
+
+if (Test-Path $vswhere) {
+    $installPath = & $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
+    if ($installPath) {
+        $vcInstalled = $true
+        Write-Host "C++ Build Tools (MSVC) detectados en: $installPath" -ForegroundColor Green
     }
-} else {
-    Write-Host "Compilador cl.exe (MSVC) disponible en PATH." -ForegroundColor Green
+}
+
+if (-not $vcInstalled) {
+    Write-Host "Workload C++ no encontrado. Instalando herramientas de compilación C++ (MSVC)..." -ForegroundColor Yellow
+    choco install -y visualstudio2022-workload-vctools
 }
 
 Write-Host "=== [dev-forge : Windows] 10-msvc: Entorno C++ MSVC verificado ===" -ForegroundColor Green
