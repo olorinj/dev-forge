@@ -20,3 +20,4 @@ When looking for established solutions or comparing implementations across sibli
 - Hypervisor CLI Management: [.agents/rules/projects/orquestador.md](.agents/rules/projects/orquestador.md)
 - Document & XML Run Processing: [.agents/rules/projects/corrector-docx.md](.agents/rules/projects/corrector-docx.md)
 - Domain Isolation & Spanish Docstrings: [.agents/rules/projects/academia.md](.agents/rules/projects/academia.md)
+
