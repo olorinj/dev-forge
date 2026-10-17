@@ -1,6 +1,6 @@
 # Arquitectura del Sistema - `dev-forge`
 
-`dev-forge` es una plataforma desacoplada de virtualización y compilación cruzada multi-lenguaje concebida para ejecutar compilaciones limpias e independientes del host (Modo B offline).
+`dev-forge` es una plataforma desacoplada de virtualización y compilación cruzada multi-lenguaje concebida para ejecutar compilaciones limpias e independientes del host (100% offline).
 
 ## 1. Diagrama de Arquitectura Global
 
@@ -51,7 +51,7 @@ flowchart TD
 
 ---
 
-## 2. Flujo de Compilación Desacoplada (Modo B)
+## 2. Flujo de Compilación Desacoplada (100% Offline)
 
 ```mermaid
 sequenceDiagram

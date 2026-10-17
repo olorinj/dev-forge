@@ -4,7 +4,7 @@
 
 [forge]
 version = "1.0.0"
-mode = "offline" # "offline" (Modo B local) | "runner" (Modo A self-hosted)
+mode = "offline" # "offline" (100% offline local) | "runner" (self-hosted)
 
 [virtualbox]
 gui_enabled = false

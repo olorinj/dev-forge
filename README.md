@@ -1,6 +1,6 @@
 # dev-forge 🔨
 
-> **Forja Universal de Compilación y Desarrollo Multiplataforma (Modo B Offline)**
+> **Forja Universal de Compilación y Desarrollo Multiplataforma (100% Offline)**
 
 `dev-forge` es un orquestador autónomo diseñado para compilar y empaquetar aplicaciones en múltiples lenguajes (**Rust, Java, Android, Python, Go, Node.js y C/C++**) hacia múltiples plataformas (**Linux, Windows nativo con MSVC y macOS**) mediante entornos virtualizados limpios y aislados, sin requerir conexión a internet obligatoria ni contaminar el sistema operativo anfitrión.
 
@@ -21,7 +21,7 @@ flowchart LR
 
 ## 🌟 Características Principales
 
-- **🎯 Modo B (100% Offline)**: Ejecución y empaquetado directo en local sin depender de GitHub Actions ni subir código a la nube.
+- **🎯 100% Offline**: Ejecución y empaquetado directo en local sin depender de GitHub Actions ni subir código a la nube.
 - **🌐 Soporte Multi-Lenguaje Nativo**:
   - **Rust**: Soporte completo para aplicaciones CLI y GUIs en Tauri.
   - **Java & Android**: OpenJDK 21 LTS, Gradle y compilación de paquetes móviles APK/AAB.

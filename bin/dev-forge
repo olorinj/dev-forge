@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# dev-forge : CLI Orquestador Multi-Lenguaje y Multiplataforma (Modo B Offline)
+# dev-forge : CLI Orquestador Multi-Lenguaje y Multiplataforma (100% Offline)
 # =============================================================================
 set -e
 
@@ -29,7 +29,7 @@ print_banner() {
     echo "    | |_| | |___  \ V /|_____|  _|| |_| |  _ <| |_| | |___ "
     echo "    |____/|_____|  \_/       |_|   \___/|_| \_\\____|_____|"
     echo "  ================================================================"
-    echo -e "       Forja Universal de Compilación Multi-Lenguaje (Modo B)${RESET}\n"
+    echo -e "       Forja Universal de Compilación Multi-Lenguaje (100% Offline)${RESET}\n"
 }
 
 print_help() {

@@ -16,7 +16,7 @@ function Show-Banner {
     Write-Host "    | |_| | |___  \ V /|_____|  _|| |_| |  _ <| |_| | |___ " -ForegroundColor Cyan
     Write-Host "    |____/|_____|  \_/       |_|   \___/|_| \_\\____|_____|" -ForegroundColor Cyan
     Write-Host "  ================================================================" -ForegroundColor Cyan
-    Write-Host "       Forja Universal de Compilacion Multi-Lenguaje (Modo B)`n" -ForegroundColor Gray
+    Write-Host "       Forja Universal de Compilacion Multi-Lenguaje (100% Offline)`n" -ForegroundColor Gray
 }
 
 function Show-Help {
