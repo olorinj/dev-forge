@@ -10,10 +10,28 @@ Vagrant.configure("2") do |config|
     config.vbguest.auto_update = false
   end
 
+  # Detección del sistema operativo anfitrión (Host OS)
+  is_darwin = (RbConfig::CONFIG['host_os'] =~ /darwin|mac os/i)
+  is_windows = (RbConfig::CONFIG['host_os'] =~ /mswin|msys|mingw|cygwin|bccwin|wince|emc/i)
+
   # Detección y normalización del teclado del host para ambas VMs
   host_kb = ENV["FORGE_HOST_KEYBOARD"].to_s.strip
   if host_kb.empty?
-    host_kb = `(localectl status 2>/dev/null | awk '/X11 Layout/{print $3}') || (grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '\"' | tr -d \"'\")`.strip rescue ""
+    if is_darwin
+      mac_src = `defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources 2>/dev/null | grep 'KeyboardLayout Name' | head -n 1 | awk -F'"' '{print $4}'`.strip rescue ""
+      case mac_src.downcase
+      when /spanish|español/ then host_kb = "es"
+      when /latin|latam/     then host_kb = "latam"
+      when /british|uk/      then host_kb = "gb"
+      when /french|français/ then host_kb = "fr"
+      when /german|deutsch/  then host_kb = "de"
+      when /italian|italiano/ then host_kb = "it"
+      when /portuguese/      then host_kb = "pt"
+      when /u\.s\.|us|abc/   then host_kb = "us"
+      end
+    else
+      host_kb = `(localectl status 2>/dev/null | awk '/X11 Layout/{print $3}') || (grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '\"' | tr -d \"'\")`.strip rescue ""
+    end
     host_kb = ENV["LANG"].to_s.split('_').first.downcase if host_kb.empty?
     host_kb = "es" if host_kb.empty?
   end
@@ -69,10 +87,10 @@ Vagrant.configure("2") do |config|
       vb.memory = ENV.fetch("FORGE_LINUX_MEM", "4096")
       vb.cpus = ENV.fetch("FORGE_LINUX_CPUS", "4")
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
-      vb.customize ["modifyvm", :id, "--paravirtprovider", "kvm"]
+      vb.customize ["modifyvm", :id, "--paravirtprovider", is_darwin ? "default" : "kvm"]
       vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
       vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"]
-      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"] unless is_darwin
       vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
       vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]

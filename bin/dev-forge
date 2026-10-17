@@ -101,6 +101,21 @@ detect_host_keyboard() {
     if [ -z "$layout" ] && command -v setxkbmap >/dev/null 2>&1; then
         layout=$(setxkbmap -query 2>/dev/null | awk '/layout/{print $2}' | cut -d',' -f1)
     fi
+    # Soporte nativo para host macOS
+    if [ -z "$layout" ] && command -v defaults >/dev/null 2>&1; then
+        local mac_source
+        mac_source=$(defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources 2>/dev/null | grep 'KeyboardLayout Name' | head -n 1 | awk -F'"' '{print $4}')
+        case "${mac_source,,}" in
+            *spanish*|*español*) layout="es" ;;
+            *latin*|*latam*)     layout="latam" ;;
+            *british*|*uk*)      layout="gb" ;;
+            *french*|*français*) layout="fr" ;;
+            *german*|*deutsch*)  layout="de" ;;
+            *italian*|*italiano*) layout="it" ;;
+            *portuguese*)        layout="pt" ;;
+            *u.s.*|*us*|*abc*)   layout="us" ;;
+        esac
+    fi
     if [ -z "$layout" ]; then
         layout=$(echo "${LANG:-es}" | cut -d'_' -f1 | tr '[:upper:]' '[:lower:]')
     fi

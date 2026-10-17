@@ -37,53 +37,93 @@ flowchart LR
 
 ---
 
-## 📦 Instalación y Requisitos
+## 📦 Instalación y Requisitos en el Host
 
-### Requisitos en el Host
-1. **VirtualBox** (>= 7.0)
-2. **Vagrant** (>= 2.3)
-3. **Bash** y utilidades estándar
+`dev-forge` está diseñado para ejecutarse como orquestador anfitrión en **Linux**, **Windows** y **macOS**:
+
+### Requisitos por Sistema Operativo Anfitrión
+
+| Sistema Anfitrión | Hipervisor & Herramientas | Shell Compatible | Instalación Recomendada |
+| :--- | :--- | :--- | :--- |
+| **Linux** (Debian, Ubuntu, Fedora, Arch) | VirtualBox (>= 7.0), Vagrant (>= 2.3) | **Bash** (>= 4.0) | `sudo apt install virtualbox vagrant` |
+| **Windows** (10 / 11) | VirtualBox (>= 7.0), Vagrant (>= 2.3) | **PowerShell** (5.1 o 7+) | `winget install Oracle.VirtualBox HashiCorp.Vagrant` o `choco install virtualbox vagrant` |
+| **macOS** (Intel / Apple Silicon) | VirtualBox (>= 7.0), Vagrant (>= 2.3) | **Zsh** o **Bash** | `brew install --cask virtualbox vagrant` |
+
+> [!NOTE]
+> En **macOS con Apple Silicon (M1/M2/M3/M4)**, VirtualBox 7.x ejecuta máquinas virtuales compatibles con arquitecturas ARM. Para compilar ejecutables x86_64 o Windows MSVC, la forja se apoya en emulación y en el compilador cruzado `forge-linux`.
+
+---
 
 ### Preparación del CLI
-Puedes añadir `dev-forge` a tu `PATH` personal o crear un alias en tu shell (`~/.bashrc` o `~/.zshrc`):
 
+#### En Linux y macOS (Bash / Zsh):
+Añade `dev-forge` a tu `PATH` o crea un alias en tu archivo de configuración (`~/.bashrc` o `~/.zshrc`):
 ```bash
-# Añadir al PATH
-export PATH="/home/olorinj/DEV/dev-forge/bin:$PATH"
+# Añadir al PATH permanentemente
+export PATH="/home/usuario/DEV/dev-forge/bin:$PATH"
 
 # O mediante alias rápido
-alias dev-forge="/home/olorinj/DEV/dev-forge/bin/dev-forge"
+alias dev-forge="/home/usuario/DEV/dev-forge/bin/dev-forge"
+```
+
+#### En Windows (PowerShell):
+Añade la ruta al perfil de PowerShell (`notepad $PROFILE`):
+```powershell
+# Añadir al PATH de la sesión o del usuario
+$env:Path += ";C:\DEV\dev-forge\bin"
+
+# O crear un alias en tu $PROFILE
+Set-Alias -Name dev-forge -Value "C:\DEV\dev-forge\bin\dev-forge.ps1"
 ```
 
 ---
 
 ## 💻 Uso Rápido del CLI
 
+El orquestador ofrece paridad total de comandos en ambos shells:
+
 ### 1. Compilar cualquier proyecto
+
+#### En Linux / macOS (Bash / Zsh):
 ```bash
 # Compilar proyecto en Rust o Tauri hacia todos los destinos
 dev-forge build --project /ruta/a/mi-proyecto --target all
 
-# Compilar proyecto Java hacia Android (APK / AAB)
+# Compilar proyecto Java hacia Android (APK)
 dev-forge build --project /ruta/a/mi-app-android --target android
 
-# Compilar script Python en un ejecutable Windows
+# Compilar script Python en un ejecutable Windows PE32+
 dev-forge build --project /ruta/a/mi-script --target windows
 ```
 
+#### En Windows (PowerShell):
+```powershell
+# Compilar proyecto en Rust o Tauri hacia todos los destinos
+.\bin\dev-forge.ps1 build -p C:\proyectos\mi-proyecto -t all
+
+# Compilar proyecto Java hacia Android (APK)
+.\bin\dev-forge.ps1 build -p C:\proyectos\mi-app-android -t android
+
+# Compilar ejecutable nativo Windows con MSVC
+.\bin\dev-forge.ps1 build -p C:\proyectos\mi-script -t windows
+```
+
 ### 2. Gestión de Máquinas Virtuales
+
+#### En Linux / macOS:
 ```bash
-# Consultar el estado de las máquinas de la forja
-dev-forge status
+dev-forge status         # Consultar estado de las VMs
+dev-forge up forge-linux # Iniciar máquina Linux
+dev-forge halt           # Detener todas las VMs para liberar RAM
+dev-forge ssh            # Abrir terminal interactiva en forge-linux
+```
 
-# Iniciar manualmente una máquina específica
-dev-forge up forge-linux
-
-# Detener máquinas para liberar memoria RAM y CPU
-dev-forge halt
-
-# Acceder por SSH a la máquina Linux
-dev-forge ssh
+#### En Windows:
+```powershell
+.\bin\dev-forge.ps1 status         # Consultar estado de las VMs
+.\bin\dev-forge.ps1 up forge-linux # Iniciar máquina Linux
+.\bin\dev-forge.ps1 halt           # Detener todas las VMs
+.\bin\dev-forge.ps1 ssh            # Sesión SSH en Linux
 ```
 
 ---
