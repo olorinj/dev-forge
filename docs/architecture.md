@@ -80,3 +80,47 @@ sequenceDiagram
 2. **Cero Polución**: Las dependencias temporales y archivos intermedios de compilación se procesan dentro de la VM, manteniendo el proyecto cliente limpio.
 3. **Persistencia de Bóveda y Agentes**: El enlace simbólico a `.agents` asegura el cumplimiento de las directrices y estándares universales del ecosistema.
 
+---
+
+## 4. Optimizaciones de Rendimiento y Virtualización
+
+Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura incorpora los siguientes mecanismos:
+
+### 4.1 VirtIO Networking
+- En la máquina Linux (`forge-linux`), la tarjeta de red NAT principal está configurada con `--nictype1 virtio`.
+- Esto reduce drásticamente la sobrecarga de interrupciones del kernel emuladas y acelera la descarga de dependencias externas (crates de crates.io, paquetes npm, módulos Go).
+
+### 4.2 Host I/O Cache en Controladoras SATA
+- Las controladoras de almacenamiento SATA tanto en `forge-linux` (`SATA Controller`) como en `forge-windows` (`SATA`) tienen activado `--hostiocache on`.
+- Permite que VirtualBox aproveche la memoria RAM y la caché del sistema operativo anfitrión para operaciones asíncronas de lectura/escritura en disco.
+
+### 4.3 Desacoplamiento de Build Target del Sistema Compartido (`vboxsf`)
+- Las carpetas compartidas de VirtualBox (`vboxsf`) sufren de alta latencia y contención de bloqueos con miles de archivos pequeños temporales (como los generados por `cargo` o `npm`).
+- `dev-forge` redirige automáticamente los directorios de compilación a los sistemas de archivos nativos de cada máquina virtual:
+  - **Linux**: `CARGO_TARGET_DIR=/tmp/cargo-target` (en disco rápido ext4 con linker ultrarrápido `mold`).
+  - **Windows**: `CARGO_TARGET_DIR=C:\target` (en disco nativo NTFS).
+- Al finalizar la compilación, únicamente los binarios y librerías finales (`.exe`, `.dll`, ejecutables ELF, `.so`) son copiados al directorio `dist/` montado en el host.
+
+---
+
+## 5. Ergonomía del Entorno y Estabilidad Operativa
+
+### 5.1 Cuotas de Memoria WinRM en Windows
+- Por defecto, WinRM impone un límite estricto de memoria (`MaxMemoryPerShellMB = 512-1024 MB`), lo cual provoca bloqueos de conexión o fallos silenciosos durante compilaciones exigentes de MSVC o C++ nativo.
+- El aprovisionamiento de `dev-forge` eleva automáticamente esta cuota a 8192 MB:
+  ```powershell
+  Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB -Value 8192 -Force
+  ```
+
+### 5.2 Prevención de Latencia en Prompts Modernos (Starship)
+- Shells con prompts interactivos (como [Starship](https://starship.rs)) disponen de un módulo `vagrant` que consulta `vagrant status` al ingresar en cualquier directorio que contenga un `Vagrantfile`. Esto introduce una molesta latencia de 1 a 2 segundos por comando.
+- Se recomienda desactivar este módulo en la configuración del host (`~/.config/starship.toml`):
+  ```toml
+  [vagrant]
+  disabled = true
+  ```
+
+### 5.3 Localización y Teclado
+- La VM de Windows (`forge-windows`) aprovisiona por defecto el idioma del sistema y la distribución de teclado en español (`es-ES`), garantizando que las sesiones interactivas por consola o interfaz gráfica reconozcan la tilde, la 'ñ' y los caracteres especiales sin mapeos incorrectos.
+
+
