@@ -51,7 +51,7 @@ function Detect-ProjectType {
         }
         return "rust"
     }
-    if ((Test-Path (Join-Path $Path "build.gradle")) -or (Test-Path (Join-Path $Path "build.gradle.kts")) -or (Test-Path (Join-Path $Path "gradlew.bat"))) {
+    if ((Test-Path (Join-Path $Path "build.gradle")) -or (Test-Path (Join-Path $Path "build.gradle.kts")) -or (Test-Path (Join-Path $Path "gradlew.bat")) -or (Test-Path (Join-Path $Path "pom.xml")) -or (Test-Path (Join-Path $Path "src\main\java"))) {
         if ((Test-Path (Join-Path $Path "app\src\main")) -or (Select-String -Path (Join-Path $Path "build.gradle") -Pattern "com.android" -Quiet -ErrorAction SilentlyContinue)) {
             return "java-android"
         }
@@ -204,10 +204,10 @@ function Invoke-Build {
                     $linuxCmd = "cd /workspace && export CARGO_TARGET_DIR=/tmp/cargo-target && cargo build --release && mkdir -p /workspace/dist && find /tmp/cargo-target/release -maxdepth 1 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.d' -exec cp -f {} /workspace/dist/ \;"
                 }
                 "java-android" {
-                    $linuxCmd = "cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew assembleRelease; else gradle assembleRelease; fi"
+                    $linuxCmd = "cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && (./gradlew assembleRelease || ./gradlew assembleDebug); else (gradle assembleRelease || gradle assembleDebug); fi && mkdir -p /workspace/dist && find app/build/outputs/apk -name '*.apk' -exec cp -f {} /workspace/dist/ \; 2>/dev/null || true"
                 }
                 "java" {
-                    $linuxCmd = "cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew build; else gradle build; fi"
+                    $linuxCmd = "cd /workspace && if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew build; elif [ -f build.gradle ]; then gradle build; else mkdir -p build/classes /workspace/dist && javac -d build/classes `$(find src -name '*.java') && jar cfe /workspace/dist/hashforge-java.jar com.devforge.hashforge.Main -C build/classes . ; fi && mkdir -p /workspace/dist && find build/libs -name '*.jar' ! -name '*-plain.jar' -exec cp -f {} /workspace/dist/ \; 2>/dev/null || true"
                 }
                 "python" {
                     $pyName = if ($projectName -eq "python") { "hashforge-py" } else { $projectName }
@@ -268,8 +268,11 @@ function Invoke-Build {
                 "rust" {
                     $winCmd = "Set-Location c:\workspace; [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', 'c:\target'); cargo build --release; if (Test-Path c:\target\release) { New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; Get-ChildItem c:\target\release -Filter *.exe | Copy-Item -Destination c:\workspace\dist\ -Force; Get-ChildItem c:\target\release -Filter *.dll | Copy-Item -Destination c:\workspace\dist\ -Force }"
                 }
-                { $_ -in "java", "java-android" } {
-                    $winCmd = "Set-Location c:\workspace; if (Test-Path gradlew.bat) { .\gradlew.bat build } else { gradle build }"
+                "java" {
+                    $winCmd = "Set-Location c:\workspace; if (Test-Path gradlew.bat) { .\gradlew.bat build } elseif (Test-Path build.gradle) { gradle build } else { New-Item -ItemType Directory -Force -Path build\classes, c:\workspace\dist | Out-Null; javac -d build\classes (Get-ChildItem -Recurse -Filter *.java src | ForEach-Object { `$_.FullName }); jar cfe c:\workspace\dist\hashforge-java.jar com.devforge.hashforge.Main -C build\classes . }; if (Test-Path build\libs) { New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; Get-ChildItem build\libs -Filter *.jar | Where-Object { `$_.Name -notlike '*-plain.jar' } | Copy-Item -Destination c:\workspace\dist\ -Force }"
+                }
+                "java-android" {
+                    $winCmd = "Set-Location c:\workspace; if (Test-Path gradlew.bat) { .\gradlew.bat assembleRelease } else { gradle assembleRelease }; if (Test-Path app\build\outputs\apk) { New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; Get-ChildItem -Recurse app\build\outputs\apk -Filter *.apk | Copy-Item -Destination c:\workspace\dist\ -Force }"
                 }
                 "python" {
                     $pyName = if ($projectName -eq "python") { "hashforge-py" } else { $projectName }

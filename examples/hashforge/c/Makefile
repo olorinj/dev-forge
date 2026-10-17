@@ -9,3 +9,4 @@ hashforge-c: main.c
 
 clean:
 	rm -f hashforge-c *.o
+

@@ -72,3 +72,4 @@ func main() {
 	s, m := computeHashes([]byte(sample))
 	printResult(sample, s, m, *jsonFlag)
 }
+

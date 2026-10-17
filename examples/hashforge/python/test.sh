@@ -44,3 +44,4 @@ if [ "$TARGET" = "windows" ] || [ "$TARGET" = "all" ]; then
     file "$WIN_BIN" | grep -qi "PE32" || log_fail "No es un ejecutable PE32 válido"
     log_ok "Binario Windows verificado como PE32+ ($(stat -c %s "$WIN_BIN") bytes)"
 fi
+

@@ -9,6 +9,7 @@
 | **Java & Android** | `build.gradle`, `gradlew`, `pom.xml` | OpenJDK 21 LTS, Gradle, Android SDK Command-line Tools | OpenJDK 21 LTS, Gradle Windows | Linux/Windows JARs/Fat-JARs, Android APK / AAB |
 | **Python** | `pyproject.toml`, `requirements.txt` | Python 3.12, UV, Pip, Pipx, PyInstaller | Python 3.12, Pip, PyInstaller | Linux ELF autocontenido, Windows .exe autocontenido |
 | **Go** | `go.mod` | Go 1.23.2 Toolchain | Go 1.23.2 para Windows | Binarios estáticos Linux, Windows .exe, macOS |
+| **C / C++** | `CMakeLists.txt`, `Makefile` | GCC 12, Clang/LLVM 16, CMake, Make, OpenSSL | MSVC 2022 C++ Build Tools, CMake, NMake | Binarios nativos ELF Linux, Windows PE32+ .exe |
 | **Node.js / Web** | `package.json` | Node.js 20 LTS, Corepack (pnpm, yarn) | Node.js 20 LTS, npm | Bundles web (Vite, Rollup, Webpack) |
 
 ---

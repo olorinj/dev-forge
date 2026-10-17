@@ -24,7 +24,7 @@ echo -e "Destino(s):  ${BOLD}${TARGET_ARG}${RESET}"
 echo ""
 
 if [ "$LANG_ARG" = "all" ]; then
-    LANGUAGES=("rust" "python" "c" "cpp" "go")
+    LANGUAGES=("rust" "python" "c" "cpp" "go" "java" "android")
 else
     LANGUAGES=("$LANG_ARG")
 fi

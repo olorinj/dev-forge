@@ -9,3 +9,4 @@ hashforge-cpp: main.cpp
 
 clean:
 	rm -f hashforge-cpp *.o
+

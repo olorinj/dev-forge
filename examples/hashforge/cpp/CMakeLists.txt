@@ -12,3 +12,4 @@ else()
     find_package(OpenSSL REQUIRED)
     target_link_libraries(hashforge-cpp OpenSSL::Crypto)
 endif()
+

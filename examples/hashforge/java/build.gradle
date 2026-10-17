@@ -1,0 +1,27 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.devforge'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+application {
+    mainClass = 'com.devforge.hashforge.Main'
+}
+
+jar {
+    archiveFileName = 'hashforge-java.jar'
+    manifest {
+        attributes(
+            'Main-Class': 'com.devforge.hashforge.Main',
+            'Implementation-Title': 'HashForge Java',
+            'Implementation-Version': project.version
+        )
+    }
+}

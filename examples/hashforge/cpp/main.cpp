@@ -136,3 +136,4 @@ int main(int argc, char *argv[]) {
     print_result(sample, sha, md5, as_json);
     return 0;
 }
+
