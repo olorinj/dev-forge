@@ -217,6 +217,9 @@ function Invoke-Build {
                     $goName = if ($projectName -eq "go") { "hashforge-go" } else { $projectName }
                     $linuxCmd = "cd /workspace && mkdir -p /workspace/dist && go build -ldflags='-s -w' -o '/workspace/dist/$goName' ./"
                 }
+                "node" {
+                    $linuxCmd = "cd /workspace && if [ -f package-lock.json ]; then npm ci 2>/dev/null || npm install; elif [ -f package.json ]; then npm install 2>/dev/null || true; fi && if grep -q '\"build\":' package.json 2>/dev/null; then npm run build; fi && mkdir -p /workspace/dist && if [ -d dist ]; then cp -rf dist/* /workspace/dist/ 2>/dev/null || true; elif [ -f index.js ]; then cp -f index.js /workspace/dist/hashforge-node.js; fi"
+                }
                 "c-cpp" {
                     $linuxCmd = "cd /workspace && if [ -f CMakeLists.txt ]; then cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && mkdir -p /workspace/dist && find build -maxdepth 2 -type f \( -executable -o -name '*.so' -o -name '*.a' \) ! -name '*.sh' ! -name '*.txt' ! -name '*.cmake' -exec cp -f {} /workspace/dist/ \;; elif [ -f Makefile ]; then make && mkdir -p /workspace/dist && find . -maxdepth 1 -type f -executable ! -name '*.sh' -exec cp -f {} /workspace/dist/ \;; fi"
                 }
@@ -281,6 +284,9 @@ function Invoke-Build {
                 "go" {
                     $goName = if ($projectName -eq "go") { "hashforge-go" } else { $projectName }
                     $winCmd = "Set-Location c:\workspace; New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; go build -ldflags=""-s -w"" -o c:\workspace\dist\$goName.exe ./"
+                }
+                "node" {
+                    $winCmd = "Set-Location c:\workspace; if (Test-Path package-lock.json) { npm ci } elseif (Test-Path package.json) { npm install }; if (Select-String -Path package.json -Pattern '`"build`":' -Quiet -ErrorAction SilentlyContinue) { npm run build }; New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; if (Test-Path dist) { Copy-Item -Recurse -Force dist\* c:\workspace\dist\ } elseif (Test-Path index.js) { Copy-Item -Force index.js c:\workspace\dist\hashforge-node.js }"
                 }
                 "c-cpp" {
                     $winCmd = "Set-Location c:\workspace; if (Test-Path CMakeLists.txt) { cmake -B build; cmake --build build --config Release; if (Test-Path build\Release) { New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; Get-ChildItem build\Release -Filter *.exe | Copy-Item -Destination c:\workspace\dist\ -Force; Get-ChildItem build\Release -Filter *.dll | Copy-Item -Destination c:\workspace\dist\ -Force } elseif (Test-Path build) { New-Item -ItemType Directory -Force -Path c:\workspace\dist | Out-Null; Get-ChildItem build -Filter *.exe | Copy-Item -Destination c:\workspace\dist\ -Force } } elseif (Test-Path Makefile) { nmake }"

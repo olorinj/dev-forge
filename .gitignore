@@ -13,8 +13,13 @@ vbox*.log
 
 # Artefactos y Salidas de Compilación
 dist/
+**/dist/
 build/
+**/build/
 target/
+**/target/
+node_modules/
+**/node_modules/
 releases/
 *.tar.gz
 *.zip

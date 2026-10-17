@@ -1,0 +1,21 @@
+{
+  "name": "hashforge-node",
+  "version": "1.0.0",
+  "description": "HashForge reference test vector implementation in Node.js and Web",
+  "main": "index.js",
+  "bin": {
+    "hashforge-node": "./index.js"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "start": "node index.js"
+  },
+  "keywords": [
+    "hashforge",
+    "crypto",
+    "sha256",
+    "md5"
+  ],
+  "author": "dev-forge",
+  "license": "MIT"
+}

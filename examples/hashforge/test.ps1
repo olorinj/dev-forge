@@ -18,7 +18,7 @@ Write-Host ""
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $languages = if ($Language -eq "all") {
-    @("rust", "python", "c", "cpp", "go", "java", "android")
+    @("rust", "python", "c", "cpp", "go", "java", "android", "node")
 } else {
     @($Language)
 }

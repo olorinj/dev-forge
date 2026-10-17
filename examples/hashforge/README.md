@@ -23,6 +23,7 @@ flowchart TD
         L_Go["Go (CLI / standard library crypto)"]
         L_Java["Java (CLI + GUI Swing / Gradle JAR)"]
         L_Droid["Android (Mobile App / Gradle APK)"]
+        L_Node["Node.js / Web (CLI + Web GUI / Web Crypto & crypto)"]
     end
 
     CLI --> Lenguajes
@@ -30,8 +31,8 @@ flowchart TD
     Lenguajes -->|Target: windows| WinVM
     Lenguajes -->|Target: android| LinuxVM
 
-    LinuxVM -->|ELF nativo / JAR / APK| Dist["dist/ (Binarios finales)"]
-    WinVM -->|PE32+ .exe / JAR| Dist
+    LinuxVM -->|ELF nativo / JAR / APK / JS Bundle| Dist["dist/ (Binarios finales)"]
+    WinVM -->|PE32+ .exe / JAR / JS Bundle| Dist
 ```
 
 ---
@@ -47,6 +48,7 @@ flowchart TD
 | [`go/`](go/) | **Go 1.23** | CLI | Go toolchain (`go build`) | `dist/hashforge-go` | `dist/hashforge-go.exe` |
 | [`java/`](java/) | **Java 21 LTS** | CLI + GUI (`Swing`) | Gradle (`java`/`application`) | `dist/hashforge-java.jar` | `dist/hashforge-java.jar` |
 | [`android/`](android/) | **Android (Java/SDK 34)** | App Móvil Nativa | Android Gradle Plugin (AGP) | N/A | `dist/*.apk` |
+| [`node/`](node/) | **Node.js 20 LTS / Web** | CLI + Web GUI | Vanilla JS / Web Crypto & `crypto` | `dist/hashforge-node.js`, `dist/index.html` | `dist/hashforge-node.js`, `dist/index.html` |
 
 ---
 
@@ -73,6 +75,9 @@ dev-forge build -p examples/hashforge/java -t all
 
 # Compilar App Móvil Android (genera paquete APK)
 dev-forge build -p examples/hashforge/android -t android
+
+# Empaquetar Node.js / Web (CLI + Web GUI estática para dist/)
+dev-forge build -p examples/hashforge/node -t all
 ```
 
 ---
@@ -91,10 +96,12 @@ Cada subcarpeta de lenguaje contiene su propio `test.sh` y `test.ps1`. Adicional
 ./test.sh go linux
 ./test.sh java linux
 ./test.sh android android
+./test.sh node linux
 
 # Probar un lenguaje específico en forge-windows:
 ./test.sh rust windows
 ./test.sh java windows
+./test.sh node windows
 
 # Probar TODOS los lenguajes en AMBAS VMs:
 ./test.sh all all
@@ -107,6 +114,7 @@ Cada subcarpeta de lenguaje contiene su propio `test.sh` y `test.ps1`. Adicional
 .\test.ps1 -Language python -Target windows
 .\test.ps1 -Language java -Target windows
 .\test.ps1 -Language android -Target android
+.\test.ps1 -Language node -Target windows
 
 # Probar TODOS los lenguajes en AMBAS VMs:
 .\test.ps1 -Language all -Target all
