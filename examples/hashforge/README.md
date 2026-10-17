@@ -50,3 +50,4 @@ Los binarios generados se depositarán automáticamente en `examples/hashforge/d
 # En sistemas Windows / PowerShell
 .\test.ps1 [-Target linux|windows|all]
 ```
+

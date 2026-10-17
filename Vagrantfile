@@ -10,6 +10,47 @@ Vagrant.configure("2") do |config|
     config.vbguest.auto_update = false
   end
 
+  # Detección y normalización del teclado del host para ambas VMs
+  host_kb = ENV["FORGE_HOST_KEYBOARD"].to_s.strip
+  if host_kb.empty?
+    host_kb = `(localectl status 2>/dev/null | awk '/X11 Layout/{print $3}') || (grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '\"' | tr -d \"'\")`.strip rescue ""
+    host_kb = ENV["LANG"].to_s.split('_').first.downcase if host_kb.empty?
+    host_kb = "es" if host_kb.empty?
+  end
+
+  case host_kb.downcase
+  when "es", "es-es", "es_es"
+    linux_layout = "es"
+    win_lang_tag = "es-ES"
+  when "us", "en", "en-us", "en_us"
+    linux_layout = "us"
+    win_lang_tag = "en-US"
+  when "gb", "uk", "en-gb", "en_gb"
+    linux_layout = "gb"
+    win_lang_tag = "en-GB"
+  when "latam", "es-419", "es-mx", "es_mx"
+    linux_layout = "latam"
+    win_lang_tag = "es-MX"
+  when "fr", "fr-fr", "fr_fr"
+    linux_layout = "fr"
+    win_lang_tag = "fr-FR"
+  when "de", "de-de", "de_de"
+    linux_layout = "de"
+    win_lang_tag = "de-DE"
+  when "it", "it-it", "it_it"
+    linux_layout = "it"
+    win_lang_tag = "it-IT"
+  when "pt", "pt-pt", "pt_pt"
+    linux_layout = "pt"
+    win_lang_tag = "pt-PT"
+  when "br", "pt-br", "pt_br"
+    linux_layout = "br"
+    win_lang_tag = "pt-BR"
+  else
+    linux_layout = host_kb.split(/[-_]/).first.downcase
+    win_lang_tag = host_kb.include?("-") ? host_kb : "#{linux_layout}-#{linux_layout.upcase}"
+  end
+
   # ===========================================================================
   # 1. MAQUINA LINUX (Para Linux nativo, Android, y macOS cruzado con Docker)
   # ===========================================================================
@@ -41,7 +82,7 @@ Vagrant.configure("2") do |config|
     end
 
     # Aprovisionamiento modular por etapas
-    linux.vm.provision "shell", path: "provision/linux/00-base.sh"
+    linux.vm.provision "shell", path: "provision/linux/00-base.sh", args: [linux_layout]
     linux.vm.provision "shell", path: "provision/linux/10-rust.sh"
     linux.vm.provision "shell", path: "provision/linux/20-python.sh"
     linux.vm.provision "shell", path: "provision/linux/30-go.sh"
@@ -83,7 +124,7 @@ Vagrant.configure("2") do |config|
     end
 
     # Aprovisionamiento modular por etapas en Windows
-    win.vm.provision "shell", path: "provision/windows/00-base.ps1"
+    win.vm.provision "shell", path: "provision/windows/00-base.ps1", args: ["-LanguageTag", win_lang_tag]
     win.vm.provision "shell", path: "provision/windows/10-msvc.ps1"
     win.vm.provision "shell", path: "provision/windows/20-rust-msvc.ps1"
     win.vm.provision "shell", path: "provision/windows/30-python.ps1"

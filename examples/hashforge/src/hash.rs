@@ -47,3 +47,4 @@ mod tests {
         assert_eq!(res.md5, "00dfa0bf846830cfcae67dca1f543166");
     }
 }
+

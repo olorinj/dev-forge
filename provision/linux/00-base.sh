@@ -19,5 +19,14 @@ if ! mountpoint -q /vagrant; then
   mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 vagrant /vagrant 2>/dev/null || true
 fi
 
+# Configuración dinámica del teclado detectado del host
+HOST_KEYBOARD="${1:-es}"
+echo "=== [dev-forge : Linux] 00-base: Configurando distribución de teclado a '$HOST_KEYBOARD' ==="
+if [ -f /etc/default/keyboard ]; then
+  sed -i "s/^XKBLAYOUT=.*/XKBLAYOUT=\"$HOST_KEYBOARD\"/" /etc/default/keyboard 2>/dev/null || true
+fi
+which localectl >/dev/null 2>&1 && localectl set-x11-keymap "$HOST_KEYBOARD" 2>/dev/null || true
+which loadkeys >/dev/null 2>&1 && loadkeys "$HOST_KEYBOARD" 2>/dev/null || true
+
 echo "=== [dev-forge : Linux] 00-base: Paquetes esenciales configurados con éxito ==="
 

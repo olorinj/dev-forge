@@ -1,18 +1,22 @@
 ﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
+param(
+    [string]$LanguageTag = "es-ES"
+)
+
 Write-Host "=== [dev-forge : Windows] 00-base: Configurando entorno base y Chocolatey ===" -ForegroundColor Cyan
 
 Set-ExecutionPolicy Bypass -Scope Process -Force
 
-# Configuración regional y teclado en español (es-ES)
-Write-Host "Configurando teclado e idioma del sistema en español (es-ES)..." -ForegroundColor Gray
+# Configuración regional y teclado detectado del host
+Write-Host "Configurando teclado e idioma del sistema a '$LanguageTag' (detectado del host)..." -ForegroundColor Gray
 try {
-    Set-WinUserLanguageList -LanguageList (New-WinUserLanguageList "es-ES") -Force
-    Set-WinSystemLocale -SystemLocale "es-ES" -ErrorAction SilentlyContinue
-    Set-Culture -CultureInfo "es-ES" -ErrorAction SilentlyContinue
+    Set-WinUserLanguageList -LanguageList (New-WinUserLanguageList $LanguageTag) -Force
+    Set-WinSystemLocale -SystemLocale $LanguageTag -ErrorAction SilentlyContinue
+    Set-Culture -CultureInfo $LanguageTag -ErrorAction SilentlyContinue
 } catch {
-    Write-Warning "Aviso al configurar idioma regional: $_"
+    Write-Warning "Aviso al configurar idioma regional ($LanguageTag): $_"
 }
 
 # Cuota de memoria WinRM para compilaciones pesadas (8192 MB)

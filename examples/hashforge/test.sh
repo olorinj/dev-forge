@@ -76,3 +76,4 @@ fi
 
 echo ""
 log_ok "Todas las pruebas de HashForge finalizaron con éxito para target '$TARGET'."
+

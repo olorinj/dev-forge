@@ -77,6 +77,19 @@ function Format-FileSize {
     return "$Bytes B"
 }
 
+function Get-HostKeyboardLayout {
+    try {
+        $langs = Get-WinUserLanguageList -ErrorAction SilentlyContinue
+        if ($langs -and $langs.Count -gt 0) {
+            return $langs[0].LanguageTag
+        }
+    } catch {}
+    try {
+        return [System.Globalization.CultureInfo]::CurrentCulture.Name
+    } catch {}
+    return "es-ES"
+}
+
 function Invoke-Build {
     param([string[]]$ArgsList)
 
@@ -136,6 +149,11 @@ function Invoke-Build {
     Write-Info "Proyecto objetivo: $projectName ($projectPath)"
     Write-Info "Tipo detectado:    $projectType"
     Write-Info "Destino objetivo:  $target"
+
+    if (-not $env:FORGE_HOST_KEYBOARD) {
+        $env:FORGE_HOST_KEYBOARD = Get-HostKeyboardLayout
+    }
+    Write-Info "Teclado host:      $($env:FORGE_HOST_KEYBOARD)"
 
     $distPath = Join-Path $projectPath "dist"
     if (-not (Test-Path $distPath)) {

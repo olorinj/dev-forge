@@ -96,3 +96,4 @@ impl eframe::App for HashForgeApp {
         });
     }
 }
+

@@ -120,7 +120,10 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
   disabled = true
   ```
 
-### 5.3 Localización y Teclado
-- La VM de Windows (`forge-windows`) aprovisiona por defecto el idioma del sistema y la distribución de teclado en español (`es-ES`), garantizando que las sesiones interactivas por consola o interfaz gráfica reconozcan la tilde, la 'ñ' y los caracteres especiales sin mapeos incorrectos.
+### 5.3 Localización y Teclado Dinámico Host-to-Guest
+- Tanto la máquina Linux (`forge-linux`) como la de Windows (`forge-windows`) detectan automáticamente en tiempo de ejecución la distribución de teclado y configuración regional de la máquina anfitriona (host):
+  - **Detección Host**: En Linux anfitrión inspecciona `localectl`, `/etc/default/keyboard`, `setxkbmap` y `$LANG`. En Windows anfitrión consulta `Get-WinUserLanguageList` y `CultureInfo`.
+  - **Mapeo Biyectivo**: Normaliza el código de distribución (ej. `es`, `us`, `fr`, `de`, `latam`) y lo traduce al identificador de consola Linux (ej. `es`) y a la etiqueta BCP-47 de Windows (ej. `es-ES`, `en-US`, `fr-FR`).
+  - **Aprovisionamiento**: Se inyecta como parámetro en los scripts de aprovisionamiento base (`00-base.sh` en Linux y `00-base.ps1` en Windows), garantizando una experiencia de teclado 100% fiel al host físico del desarrollador sin mapeos manuales.
 
 

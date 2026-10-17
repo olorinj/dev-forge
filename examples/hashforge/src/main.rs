@@ -135,3 +135,4 @@ fn main() {
     print_result(&res, json_mode, sample);
     println!("\nPara ver todas las opciones, ejecuta: hashforge --help");
 }
+

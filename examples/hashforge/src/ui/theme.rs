@@ -21,3 +21,4 @@ impl AppTheme {
         ctx.set_visuals(visuals);
     }
 }
+

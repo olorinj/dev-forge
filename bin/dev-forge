@@ -87,6 +87,24 @@ detect_project_type() {
     fi
 }
 
+# Detección del teclado del host para replicarlo en las máquinas virtuales
+detect_host_keyboard() {
+    local layout=""
+    if command -v localectl >/dev/null 2>&1; then
+        layout=$(localectl status 2>/dev/null | awk '/X11 Layout/{print $3}')
+    fi
+    if [ -z "$layout" ] && [ -f /etc/default/keyboard ]; then
+        layout=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'" | cut -d',' -f1)
+    fi
+    if [ -z "$layout" ] && command -v setxkbmap >/dev/null 2>&1; then
+        layout=$(setxkbmap -query 2>/dev/null | awk '/layout/{print $2}' | cut -d',' -f1)
+    fi
+    if [ -z "$layout" ]; then
+        layout=$(echo "${LANG:-es}" | cut -d'_' -f1 | tr '[:upper:]' '[:lower:]')
+    fi
+    echo "${layout:-es}"
+}
+
 cmd_provision() {
     local targets=("$@")
     if [ ${#targets[@]} -eq 0 ]; then
@@ -174,6 +192,11 @@ cmd_build() {
     log_info "Proyecto objetivo: ${BOLD}${project_name}${RESET} ($project_path)"
     log_info "Tipo detectado:    ${BOLD}${project_type}${RESET}"
     log_info "Destino objetivo:  ${BOLD}${target}${RESET}"
+
+    if [ -z "$FORGE_HOST_KEYBOARD" ]; then
+        export FORGE_HOST_KEYBOARD="$(detect_host_keyboard)"
+    fi
+    log_info "Teclado host:      ${BOLD}${FORGE_HOST_KEYBOARD}${RESET}"
 
     # Asegurar carpeta dist en el proyecto cliente
     mkdir -p "$project_path/dist"
