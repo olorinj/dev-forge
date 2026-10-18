@@ -84,8 +84,8 @@ Vagrant.configure("2") do |config|
 
     linux.vm.provider "virtualbox" do |vb|
       vb.name = "FORGE-LINUX"
-      vb.memory = ENV.fetch("FORGE_LINUX_MEM", "4096")
-      vb.cpus = ENV.fetch("FORGE_LINUX_CPUS", "4")
+      vb.memory = ENV.fetch("FORGE_LINUX_MEM", "5120")
+      vb.cpus = ENV.fetch("FORGE_LINUX_CPUS", "2")
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", is_darwin ? "default" : "kvm"]
       vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
@@ -101,6 +101,7 @@ Vagrant.configure("2") do |config|
 
     # Aprovisionamiento modular por etapas
     linux.vm.provision "shell", path: "provision/linux/00-base.sh", args: [linux_layout]
+    linux.vm.provision "shell", path: "provision/linux/optimize-level2-recommended.sh"
     linux.vm.provision "shell", path: "provision/linux/10-rust.sh"
     linux.vm.provision "shell", path: "provision/linux/20-python.sh"
     linux.vm.provision "shell", path: "provision/linux/30-go.sh"
