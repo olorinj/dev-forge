@@ -22,3 +22,4 @@ fs.copyFileSync(srcHtml, dstHtml);
 console.log('[HashForge Node Build] Artefactos generados con éxito en:', distDir);
 console.log(' -', dstJs);
 console.log(' -', dstHtml);
+

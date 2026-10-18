@@ -37,3 +37,4 @@ OUT="$(node "$NODE_BIN" -s "dev-forge test" -j)"
 echo "  $OUT"
 echo "$OUT" | grep -q "$EXPECTED_SHA" && echo "$OUT" | grep -q "$EXPECTED_MD5" || log_fail "Hash inválido"
 log_ok "HashForge Node.js / Web verificado exitosamente (SHA-256: $EXPECTED_SHA)"
+
