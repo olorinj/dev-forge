@@ -8,11 +8,11 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # =============================================================================
 
 $ForgeDir = (Get-Item $PSScriptRoot).Parent.FullName
-$ConfigDir = Join-Path $ForgeDir "config"
-$ProfilePath = Join-Path $ConfigDir "forge-host.env"
+$UserForgeDir = if ($env:FORGE_USER_CONFIG_DIR) { $env:FORGE_USER_CONFIG_DIR } else { Join-Path $env:USERPROFILE ".dev-forge" }
+$ProfilePath = Join-Path $UserForgeDir "forge-host.env"
 
-if (-not (Test-Path $ConfigDir)) {
-    New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
+if (-not (Test-Path $UserForgeDir)) {
+    New-Item -ItemType Directory -Path $UserForgeDir -Force | Out-Null
 }
 
 function Write-Info { param([string]$msg) Write-Host "[forge-tune] $msg" -ForegroundColor Cyan }

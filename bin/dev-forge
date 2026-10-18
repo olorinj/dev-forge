@@ -398,12 +398,20 @@ cmd_build() {
 }
 
 ensure_host_profile() {
-    local profile="$FORGE_DIR/config/forge-host.env"
-    if [ ! -f "$profile" ]; then
+    local user_profile="${FORGE_USER_CONFIG_DIR:-$HOME/.dev-forge}/forge-host.env"
+    local repo_profile="$FORGE_DIR/config/forge-host.env"
+    local profile=""
+
+    if [ -f "$user_profile" ]; then
+        profile="$user_profile"
+    elif [ -f "$repo_profile" ]; then
+        profile="$repo_profile"
+    else
         log_err "El entorno no ha sido dimensionado para este equipo anfitrión."
         echo -e "${YELLOW}Es obligatorio ejecutar primero:${RESET} ${BOLD}dev-forge tune${RESET}\n"
         exit 1
     fi
+
     set -a
     # shellcheck disable=SC1090
     source "$profile"

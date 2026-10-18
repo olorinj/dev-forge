@@ -11,8 +11,11 @@ Vagrant.configure("2") do |config|
   end
 
   # Carga del perfil de dimensionamiento del host (generado por dev-forge tune)
-  host_profile = File.expand_path("config/forge-host.env", __dir__)
-  if File.exist?(host_profile)
+  user_profile = File.expand_path("~/.dev-forge/forge-host.env")
+  repo_profile = File.expand_path("config/forge-host.env", __dir__)
+  host_profile = File.exist?(user_profile) ? user_profile : (File.exist?(repo_profile) ? repo_profile : nil)
+
+  if host_profile && File.exist?(host_profile)
     File.readlines(host_profile).each do |line|
       line = line.strip
       next if line.empty? || line.start_with?("#")

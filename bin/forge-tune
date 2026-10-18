@@ -7,9 +7,9 @@
 set -e
 
 FORGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG_DIR="$FORGE_DIR/config"
-PROFILE_PATH="$CONFIG_DIR/forge-host.env"
-mkdir -p "$CONFIG_DIR"
+USER_FORGE_DIR="${FORGE_USER_CONFIG_DIR:-$HOME/.dev-forge}"
+PROFILE_PATH="$USER_FORGE_DIR/forge-host.env"
+mkdir -p "$USER_FORGE_DIR"
 
 # Colores y Formato
 BOLD="\e[1m"

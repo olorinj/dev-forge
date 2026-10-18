@@ -331,8 +331,13 @@ function Invoke-Build {
 }
 
 function Ensure-HostProfile {
-    $profilePath = Join-Path $ForgeDir "config\forge-host.env"
-    if (-not (Test-Path $profilePath)) {
+    $userProfileDir = if ($env:FORGE_USER_CONFIG_DIR) { $env:FORGE_USER_CONFIG_DIR } else { Join-Path $env:USERPROFILE ".dev-forge" }
+    $userProfile = Join-Path $userProfileDir "forge-host.env"
+    $repoProfile = Join-Path $ForgeDir "config\forge-host.env"
+
+    $profilePath = if (Test-Path $userProfile) { $userProfile } elseif (Test-Path $repoProfile) { $repoProfile } else { $null }
+
+    if (-not $profilePath) {
         Write-Err "El entorno no ha sido dimensionado para este equipo anfitrion."
         Write-Host "Es obligatorio ejecutar primero: .\bin\dev-forge.ps1 tune`n" -ForegroundColor Yellow
         exit 1
