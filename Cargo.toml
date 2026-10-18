@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/forge-cli",
+]
+resolver = "2"
+
