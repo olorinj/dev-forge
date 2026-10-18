@@ -10,6 +10,18 @@ Vagrant.configure("2") do |config|
     config.vbguest.auto_update = false
   end
 
+  # Carga del perfil de dimensionamiento del host (generado por dev-forge tune)
+  host_profile = File.expand_path("config/forge-host.env", __dir__)
+  if File.exist?(host_profile)
+    File.readlines(host_profile).each do |line|
+      line = line.strip
+      next if line.empty? || line.start_with?("#")
+      key, val = line.split("=", 2)
+      val = val.to_s.gsub(/^["']|["']$/, '')
+      ENV[key] ||= val
+    end
+  end
+
   # Detección del sistema operativo anfitrión (Host OS)
   is_darwin = (RbConfig::CONFIG['host_os'] =~ /darwin|mac os/i)
   is_windows = (RbConfig::CONFIG['host_os'] =~ /mswin|msys|mingw|cygwin|bccwin|wince|emc/i)

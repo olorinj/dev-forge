@@ -38,6 +38,7 @@ print_help() {
     echo "  dev-forge <comando> [opciones]"
     echo ""
     echo -e "${BOLD}COMANDOS:${RESET}"
+    echo -e "  ${GREEN}tune${RESET}        Detecta recursos del host y dimensiona de forma óptima ambas VMs"
     echo -e "  ${GREEN}build${RESET}      Compila un proyecto externo en las VMs correspondientes"
     echo -e "  ${GREEN}status${RESET}     Muestra el estado de las máquinas virtuales de la forja"
     echo -e "  ${GREEN}up${RESET}         Inicia una máquina virtual (forge-linux | forge-windows)"
@@ -396,28 +397,51 @@ cmd_build() {
     fi
 }
 
+ensure_host_profile() {
+    local profile="$FORGE_DIR/config/forge-host.env"
+    if [ ! -f "$profile" ]; then
+        log_err "El entorno no ha sido dimensionado para este equipo anfitrión."
+        echo -e "${YELLOW}Es obligatorio ejecutar primero:${RESET} ${BOLD}dev-forge tune${RESET}\n"
+        exit 1
+    fi
+    set -a
+    # shellcheck disable=SC1090
+    source "$profile"
+    set +a
+}
+
 # Enrutador principal de comandos
 case "$1" in
+    tune)
+        shift
+        bash "$FORGE_DIR/bin/forge-tune" "$@"
+        ;;
     build)
+        ensure_host_profile
         shift
         cmd_build "$@"
         ;;
     status)
+        ensure_host_profile
         (cd "$FORGE_DIR" && vagrant status)
         ;;
     up)
+        ensure_host_profile
         shift
         (cd "$FORGE_DIR" && vagrant up "$@")
         ;;
     halt)
+        ensure_host_profile
         shift
         (cd "$FORGE_DIR" && vagrant halt "$@")
         ;;
     provision)
+        ensure_host_profile
         shift
         cmd_provision "$@"
         ;;
     ssh)
+        ensure_host_profile
         shift
         (cd "$FORGE_DIR" && vagrant ssh forge-linux "$@")
         ;;

@@ -24,6 +24,7 @@ function Show-Help {
     Write-Host "USO:" -ForegroundColor White
     Write-Host "  dev-forge.ps1 <comando> [opciones]`n"
     Write-Host "COMANDOS:" -ForegroundColor White
+    Write-Host "  tune       Detecta recursos del host y dimensiona de forma optima ambas VMs" -ForegroundColor Green
     Write-Host "  build      Compila un proyecto externo en las VMs correspondientes" -ForegroundColor Green
     Write-Host "  status     Muestra el estado de las maquinas virtuales de la forja" -ForegroundColor Green
     Write-Host "  up         Inicia una maquina virtual (forge-linux | forge-windows)" -ForegroundColor Green
@@ -329,31 +330,59 @@ function Invoke-Build {
     }
 }
 
+function Ensure-HostProfile {
+    $profilePath = Join-Path $ForgeDir "config\forge-host.env"
+    if (-not (Test-Path $profilePath)) {
+        Write-Err "El entorno no ha sido dimensionado para este equipo anfitrion."
+        Write-Host "Es obligatorio ejecutar primero: .\bin\dev-forge.ps1 tune`n" -ForegroundColor Yellow
+        exit 1
+    }
+    Get-Content $profilePath | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $varName = $parts[0].Trim()
+            $varVal = $parts[1].Trim().Trim('"').Trim("'")
+            [Environment]::SetEnvironmentVariable($varName, $varVal, "Process")
+        }
+    }
+}
+
 # Enrutador principal
 $cmd = if ($args.Count -gt 0) { $args[0] } else { "" }
 $remainingArgs = if ($args.Count -gt 1) { $args[1..($args.Count - 1)] } else { @() }
 
 switch ($cmd) {
+    "tune" {
+        $tuneScript = Join-Path $ForgeDir "bin\forge-tune.ps1"
+        & $tuneScript @remainingArgs
+    }
     "build" {
+        Ensure-HostProfile
         Invoke-Build -ArgsList $remainingArgs
     }
     "status" {
+        Ensure-HostProfile
         Push-Location $ForgeDir
         try { & vagrant status } finally { Pop-Location }
     }
     "up" {
+        Ensure-HostProfile
         Push-Location $ForgeDir
         try { & vagrant up @remainingArgs } finally { Pop-Location }
     }
     "halt" {
+        Ensure-HostProfile
         Push-Location $ForgeDir
         try { & vagrant halt @remainingArgs } finally { Pop-Location }
     }
     "provision" {
+        Ensure-HostProfile
         Push-Location $ForgeDir
         try { & vagrant provision @remainingArgs } finally { Pop-Location }
     }
     "ssh" {
+        Ensure-HostProfile
         Push-Location $ForgeDir
         try { & vagrant ssh forge-linux @remainingArgs } finally { Pop-Location }
     }

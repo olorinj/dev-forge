@@ -57,3 +57,8 @@ Thumbs.db
 *.sublime-project
 *.sublime-workspace
 
+# Perfiles de Entorno y Dimensionamiento Local del Host
+*.env
+config/*.env
+!config/*.env.example
+
