@@ -113,7 +113,7 @@ Vagrant.configure("2") do |config|
   # 2. MAQUINA WINDOWS (Para ejecutables nativos MSVC, instaladores WiX/Inno)
   # ===========================================================================
   config.vm.define "forge-windows", autostart: false do |win|
-    win.vm.box = "gusztavvargadr/visual-studio-2022-community-windows-11"
+    win.vm.box = "gusztavvargadr/windows-server-2022-standard-core"
     win.vm.hostname = "forge-windows"
     win.vm.boot_timeout = 1800
     win.vm.communicator = "winrm"
@@ -128,21 +128,23 @@ Vagrant.configure("2") do |config|
 
     win.vm.provider "virtualbox" do |vb|
       vb.name = "FORGE-WINDOWS"
-      vb.memory = ENV.fetch("FORGE_WIN_MEM", "8192")
-      vb.cpus = ENV.fetch("FORGE_WIN_CPUS", "4")
+      vb.memory = ENV.fetch("FORGE_WIN_MEM", "5120")
+      vb.cpus = ENV.fetch("FORGE_WIN_CPUS", "2")
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "hyperv"]
+      vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
       vb.customize ["storagectl", :id, "--name", "SATA", "--hostiocache", "on"]
       vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
       vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
       vb.customize ["modifyvm", :id, "--audio", "none"]
-      vb.customize ["modifyvm", :id, "--vram", "128"]
+      vb.customize ["modifyvm", :id, "--vram", "16"]
       vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
     end
 
     # Aprovisionamiento modular por etapas en Windows
     win.vm.provision "shell", path: "provision/windows/00-base.ps1", args: ["-LanguageTag", win_lang_tag]
+    win.vm.provision "shell", path: "provision/windows/optimize-level2-recommended.ps1"
     win.vm.provision "shell", path: "provision/windows/10-msvc.ps1"
     win.vm.provision "shell", path: "provision/windows/20-rust-msvc.ps1"
     win.vm.provision "shell", path: "provision/windows/30-python.ps1"
