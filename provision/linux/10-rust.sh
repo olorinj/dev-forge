@@ -24,6 +24,15 @@ chmod +x /etc/profile.d/rust.sh
 ln -sf /root/.cargo/bin/* /usr/local/bin/ 2>/dev/null || true
 ln -sf /home/vagrant/.cargo/bin/* /usr/local/bin/ 2>/dev/null || true
 
+# Instalar sccache para aceleración de compilaciones Rust
+if ! command -v sccache >/dev/null 2>&1; then
+  echo "Instalando sccache..."
+  curl -sSL https://github.com/mozilla/sccache/releases/download/v0.8.2/sccache-v0.8.2-x86_64-unknown-linux-musl.tar.gz | tar xz -C /tmp
+  mv /tmp/sccache-v0.8.2-x86_64-unknown-linux-musl/sccache /usr/local/bin/
+  chmod +x /usr/local/bin/sccache
+  rm -rf /tmp/sccache*
+fi
+
 # Configurar enlazador ultrarrápido 'mold'
 mkdir -p /home/vagrant/.cargo /root/.cargo
 cat << 'EOF' > /home/vagrant/.cargo/config.toml

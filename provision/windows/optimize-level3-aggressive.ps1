@@ -35,6 +35,9 @@ function Write-Log {
 
 # Ejecutar Nivel 2 primero
 $Level2Path = "$PSScriptRoot\optimize-level2-recommended.ps1"
+if (-not (Test-Path $Level2Path)) {
+    $Level2Path = "C:\forge\provision\windows\optimize-level2-recommended.ps1"
+}
 if (Test-Path $Level2Path) {
     & $Level2Path -Rollback:$Rollback
 }

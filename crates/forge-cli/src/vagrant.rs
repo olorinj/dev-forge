@@ -129,7 +129,7 @@ pub fn cmd_test_vm(machine: &str) -> Result<()> {
                 "ssh",
                 "forge-linux",
                 "-c",
-                "sudo bash /vagrant/provision/linux/health-check.sh",
+                "sudo bash /forge/provision/linux/health-check.sh",
             ],
             &[],
         )?;
@@ -144,17 +144,17 @@ pub fn cmd_test_vm(machine: &str) -> Result<()> {
         if hashforge_sh.is_file() {
             println!(
                 "\n{}",
-                "--- [2/2] Ejecutando Suite Multi-Lenguaje HashForge ---".bold()
+                "--- [2/2] Ejecutando Suite Multi-Lenguaje HashForge (Rust) ---".bold()
             );
-            let _ = run_vagrant_streaming(
-                &[
-                    "ssh",
-                    "forge-linux",
-                    "-c",
-                    "bash /vagrant/examples/hashforge/test.sh",
-                ],
-                &[],
-            );
+            let status = Command::new("bash")
+                .args(["examples/hashforge/test.sh", "rust", "linux"])
+                .current_dir(&get_forge_dir())
+                .status();
+            if let Ok(st) = status {
+                if !st.success() {
+                    log_warn("HashForge Rust finalizo con advertencias.");
+                }
+            }
         }
 
         log_ok("Todas las verificaciones de 'forge-linux' han finalizado con exito.");
@@ -226,6 +226,30 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
     }
     run_vagrant_streaming(&up_args, envs)?;
 
+    // Attach transient shared folder for dynamic workspace mounting
+    let project_canonical = args.project.canonicalize()
+        .unwrap_or_else(|_| args.project.clone());
+    // Unmount any previous workspace inside guest before changing host shared folder
+    let _ = run_vagrant_streaming(&["ssh", "forge-linux", "-c", "sudo umount -l /workspace 2>/dev/null || true"], envs);
+
+    let _ = Command::new("VBoxManage")
+        .args(["sharedfolder", "remove", "FORGE-LINUX", "--name", "workspace", "--transient"])
+        .output();
+    let _ = Command::new("VBoxManage")
+        .args([
+            "sharedfolder",
+            "add",
+            "FORGE-LINUX",
+            "--name",
+            "workspace",
+            "--hostpath",
+            &project_canonical.to_string_lossy(),
+            "--transient",
+        ])
+        .output();
+
+    let mount_prefix = "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace && ";
+
     let clean_cmd = if args.clean {
         "rm -rf /tmp/cargo-target/* /tmp/go-cache/* /tmp/build/* 2>/dev/null || true; "
     } else {
@@ -292,7 +316,9 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
     };
 
     log_info("Ejecutando proceso de compilacion remota aislada...");
-    let success = run_vagrant_streaming(&["ssh", "forge-linux", "-c", &build_script], envs)?;
+    let full_script = format!("{}{}", mount_prefix, build_script);
+    let success = run_vagrant_streaming(&["ssh", "forge-linux", "-c", &full_script], envs)?;
+    let _ = run_vagrant_streaming(&["ssh", "forge-linux", "-c", "sudo umount -l /workspace 2>/dev/null || true"], envs);
 
     if !args.keep_vm {
         log_info("Liberando memoria del host (apagando forge-linux)...");

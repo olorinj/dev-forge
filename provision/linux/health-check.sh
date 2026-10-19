@@ -3,6 +3,7 @@
 # dev-forge : Health-Check & Validation Suite for Debian 12 Build Node
 # =============================================================================
 set -e
+export PATH="$PATH:/sbin:/usr/sbin"
 
 LOG_FILE="/var/log/build-vm-health.log"
 echo "=== [dev-forge] Health-Check Report $(date '+%Y-%m-%d %H:%M:%S') ===" | tee "$LOG_FILE"
@@ -15,10 +16,10 @@ check() {
   local cmd="$2"
   if eval "$cmd"; then
     echo -e " \033[32m✔ PASS\033[0m : $name" | tee -a "$LOG_FILE"
-    ((PASS++))
+    PASS=$((PASS + 1))
   else
     echo -e " \033[31m✘ FAIL\033[0m : $name" | tee -a "$LOG_FILE"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
   fi
 }
 
@@ -50,3 +51,5 @@ echo "=========================================================="
 echo " RESUMEN HEALTH-CHECK: Superados: $PASS | Fallidos: $FAIL"
 echo " Reporte guardado en $LOG_FILE"
 echo "=========================================================="
+
+[ "$FAIL" -eq 0 ]

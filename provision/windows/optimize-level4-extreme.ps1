@@ -37,6 +37,9 @@ function Write-Log {
 
 # Ejecutar Nivel 3 primero
 $Level3Path = "$PSScriptRoot\optimize-level3-aggressive.ps1"
+if (-not (Test-Path $Level3Path)) {
+    $Level3Path = "C:\forge\provision\windows\optimize-level3-aggressive.ps1"
+}
 if (Test-Path $Level3Path) {
     & $Level3Path -Rollback:$Rollback
 }

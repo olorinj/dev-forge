@@ -11,7 +11,10 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIR="/forge/provision/linux"
+if [ ! -d "$DIR" ]; then
+  DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 LOG_FILE="/var/log/build-vm-optimize.log"
 TODAY=$(date +%Y%m%d)
 BACKUP_DIR="/root/backup-optimize-$TODAY"
@@ -76,6 +79,10 @@ fi
 # 4. Kernel Tuning Avanzado: Buffers y Descriptores
 log "Aplicando kernel sysctl para gestión de memoria de compilación..."
 cat << 'EOF' > /etc/sysctl.d/95-build-level2.conf
+# Minimizar agresividad de swap y retener inodos para árboles de código fuente
+vm.swappiness = 10
+vm.vfs_cache_pressure = 50
+
 # Buffers de páginas sucias para ráfagas de escritura secuencial
 vm.dirty_ratio = 40
 vm.dirty_background_ratio = 10
@@ -123,7 +130,9 @@ export CARGO_TARGET_DIR=/tmp/cargo-target
 export CARGO_BUILD_JOBS=2
 export CCACHE_DIR=/var/cache/ccache
 export SCCACHE_DIR=/var/cache/sccache
-export RUSTC_WRAPPER=sccache
+if command -v sccache >/dev/null 2>&1; then
+  export RUSTC_WRAPPER=sccache
+fi
 export GOPATH=/opt/go
 export GOCACHE=/tmp/go-cache
 export MAVEN_OPTS="-Xmx3584m -XX:+UseG1GC -Dfile.encoding=UTF-8"

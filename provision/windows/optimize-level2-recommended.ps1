@@ -41,6 +41,9 @@ function Write-Log {
 
 # Ejecutar Nivel 1 primero
 $Level1Path = "$PSScriptRoot\optimize-level1-conservative.ps1"
+if (-not (Test-Path $Level1Path)) {
+    $Level1Path = "C:\forge\provision\windows\optimize-level1-conservative.ps1"
+}
 if (Test-Path $Level1Path) {
     & $Level1Path -Rollback:$Rollback
 }
