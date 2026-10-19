@@ -149,7 +149,7 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "hyperv"]
       vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
-      vb.customize ["storagectl", :id, "--name", "SATA", "--hostiocache", "on"]
+      vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"]
       vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
       vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
