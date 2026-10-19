@@ -385,7 +385,7 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
         ])
         .output();
 
-    let mount_prefix = "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace 2>/dev/null || true; sudo systemctl daemon-reload 2>/dev/null || true; source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.cargo/bin:/root/.cargo/bin:/usr/local/bin:/home/vagrant/.local/bin:$PATH\"; if [ -d /forge-cache ]; then export CARGO_HOME=/forge-cache/cargo GOMODCACHE=/forge-cache/go/pkg/mod PIP_CACHE_DIR=/forge-cache/pip GRADLE_USER_HOME=/forge-cache/gradle; mkdir -p /forge-cache/cargo /forge-cache/go/pkg/mod /forge-cache/pip /forge-cache/gradle; fi; ";
+    let mount_prefix = "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace 2>/dev/null || true; sudo systemctl daemon-reload 2>/dev/null || true; sudo chmod 666 /dev/fuse 2>/dev/null || true; export APPIMAGE_EXTRACT_AND_RUN=1; export NO_STRIP=1; source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.cargo/bin:/root/.cargo/bin:/usr/local/bin:/home/vagrant/.local/bin:$PATH\"; if [ -d /forge-cache ]; then export CARGO_HOME=/forge-cache/cargo GOMODCACHE=/forge-cache/go/pkg/mod PIP_CACHE_DIR=/forge-cache/pip GRADLE_USER_HOME=/forge-cache/gradle; mkdir -p /forge-cache/cargo /forge-cache/go/pkg/mod /forge-cache/pip /forge-cache/gradle; fi; ";
 
     let clean_cmd = if args.clean {
         "rm -rf /tmp/cargo-target/* /tmp/go-cache/* /tmp/build/* 2>/dev/null || true; "
@@ -398,14 +398,20 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
 
     let build_script = match ptype {
         ProjectType::RustTauri => format!(
-            "{}if ! command -v cargo-tauri >/dev/null 2>&1; then \
+            "{}export APPIMAGE_EXTRACT_AND_RUN=1; export NO_STRIP=1; \
+            if ! command -v cargo-tauri >/dev/null 2>&1; then \
                 if command -v cargo-binstall >/dev/null 2>&1; then \
                     cargo-binstall -y --no-confirm tauri-cli 2>/dev/null || true; \
                 elif command -v npm >/dev/null 2>&1; then \
                     sudo npm install -g @tauri-apps/cli 2>/dev/null || true; \
                 fi; \
             fi; \
-            cd /workspace && (cargo tauri build || npx --yes @tauri-apps/cli build || npx --yes tauri build) && (mkdir -p /workspace/dist && (cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || cp src-tauri/target/release/$(grep -m1 name src-tauri/Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null || cp target/release/$(grep -m1 name Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null))",
+            cd /workspace && (cargo tauri build || npx --yes @tauri-apps/cli build || npx --yes tauri build) && \
+            (mkdir -p /workspace/dist && \
+             find /tmp/cargo-target/release/bundle/ src-tauri/target/release/bundle/ target/release/bundle/ -type f \\( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \\) -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true; \
+             cp -r /tmp/cargo-target/release/bundle/* /workspace/dist/ 2>/dev/null || true; \
+             cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || true; \
+             find /tmp/cargo-target/release/ src-tauri/target/release/ target/release/ -maxdepth 1 -type f -executable ! -name '*.so' ! -name '*.d' -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true)",
             clean_cmd
         ),
         ProjectType::Rust => format!(
