@@ -148,7 +148,6 @@ Vagrant.configure("2") do |config|
       vb.cpus = ENV.fetch("FORGE_WIN_CPUS", "2")
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "hyperv"]
-      vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
       vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"]
       vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
       vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
