@@ -526,6 +526,9 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
         ),
     };
 
+    let pack_ps = "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') { & 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' }";
+    let full_cmd = format!("{}{}", build_ps, pack_ps);
+
     log_info("Ejecutando proceso de compilacion remota en Windows Server Core...");
     let success = run_vagrant_streaming(
         &[
@@ -534,7 +537,7 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
             "-s",
             "powershell",
             "-c",
-            &build_ps,
+            &full_cmd,
         ],
         envs,
     )?;

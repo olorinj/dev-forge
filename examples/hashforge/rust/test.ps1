@@ -20,4 +20,14 @@ if ($Target -in @("windows", "all")) {
     if (-not (Test-Path $winBin)) { throw "No se encontro $winBin" }
     $sz = (Get-Item $winBin).Length
     Write-Host "[HashForge-Rust Test : PASS] Binario Windows verificado ($sz bytes)" -ForegroundColor Green
+
+    $winSetup = "$distDir\hashforge-setup.exe"
+    if (-not (Test-Path $winSetup)) { throw "No se encontro $winSetup" }
+    $szSetup = (Get-Item $winSetup).Length
+    Write-Host "[HashForge-Rust Test : PASS] Instalador InnoSetup verificado ($szSetup bytes)" -ForegroundColor Green
+
+    $winMsi = "$distDir\hashforge.msi"
+    if (-not (Test-Path $winMsi)) { throw "No se encontro $winMsi" }
+    $szMsi = (Get-Item $winMsi).Length
+    Write-Host "[HashForge-Rust Test : PASS] Paquete WiX MSI verificado ($szMsi bytes)" -ForegroundColor Green
 }

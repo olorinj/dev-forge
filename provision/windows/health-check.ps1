@@ -34,6 +34,9 @@ Assert-Tool "Node.js Runtime" { node --version }
 Assert-Tool "Java SDK (javac)" { javac -version }
 Assert-Tool "CMake Build System" { cmake --version }
 Assert-Tool "Ninja Build Tool" { ninja --version }
+Assert-Tool "InnoSetup Compiler (ISCC)" { ISCC.exe }
+Assert-Tool "WiX Toolset (candle)" { candle.exe -? }
+Assert-Tool "WiX Linker (light)" { light.exe -? }
 
 Write-Host "`n2. Verificando Optimizaciones del Sistema..." -ForegroundColor Yellow
 $exclusions = Get-MpPreference | Select-Object -ExpandProperty ExclusionPath -ErrorAction SilentlyContinue

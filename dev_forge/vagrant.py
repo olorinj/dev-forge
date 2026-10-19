@@ -403,8 +403,14 @@ def build_on_windows(
             f"{link_ps}{clean_ps}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}"
         )
 
+    pack_ps = (
+        "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') { "
+        "& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' }"
+    )
+    full_cmd = f"{build_ps}{pack_ps}"
+
     log_info("Ejecutando proceso de compilación remota en Windows Server Core...")
-    success = run_vagrant_streaming(["winrm", "forge-windows", "-s", "powershell", "-c", build_ps], envs)
+    success = run_vagrant_streaming(["winrm", "forge-windows", "-s", "powershell", "-c", full_cmd], envs)
 
     if not keep_vm:
         log_info("Liberando memoria del host (apagando forge-windows)...")

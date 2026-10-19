@@ -75,20 +75,26 @@ FORGE_VBOX_FOLDER="{vbox_folder}"
 
 pub fn load_host_profile() -> Result<HostProfile> {
     let toml_path = get_toml_path();
+    let env_path = get_env_path();
+
     if toml_path.is_file() {
-        let content = std::fs::read_to_string(&toml_path)
-            .with_context(|| format!("Failed to read {:?}", toml_path))?;
-        let profile: HostProfile = toml::from_str(&content)
-            .with_context(|| format!("Failed to parse TOML from {:?}", toml_path))?;
-        export_profile_env(&profile);
-        return Ok(profile);
+        if let Ok(content) = std::fs::read_to_string(&toml_path) {
+            if let Ok(profile) = toml::from_str::<HostProfile>(&content) {
+                export_profile_env(&profile);
+                return Ok(profile);
+            }
+            if let Some(profile) = parse_structured_toml(&content) {
+                export_profile_env(&profile);
+                return Ok(profile);
+            }
+        }
     }
 
-    let env_path = get_env_path();
     if env_path.is_file() {
-        let profile = parse_env_file(&env_path)?;
-        export_profile_env(&profile);
-        return Ok(profile);
+        if let Ok(profile) = parse_env_file(&env_path) {
+            export_profile_env(&profile);
+            return Ok(profile);
+        }
     }
 
     // Fallback: check workspace config/forge-host.env
@@ -103,6 +109,79 @@ pub fn load_host_profile() -> Result<HostProfile> {
         "El entorno no ha sido dimensionado para este equipo anfitrion.\n\
          Es obligatorio ejecutar primero: dev-forge tune"
     );
+}
+
+#[derive(serde::Deserialize)]
+struct StructuredToml {
+    host: Option<StructuredHost>,
+    virtualization: Option<StructuredVirt>,
+}
+
+#[derive(serde::Deserialize)]
+struct StructuredHost {
+    os: Option<String>,
+    cpu_model: Option<String>,
+    physical_cores: Option<usize>,
+    logical_cores: Option<usize>,
+    total_ram_mb: Option<u64>,
+    total_ram_gb: Option<u64>,
+    keyboard: Option<String>,
+    vbox_folder: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct StructuredVirt {
+    linux: Option<VmConfig>,
+    windows: Option<VmConfig>,
+}
+
+#[derive(serde::Deserialize)]
+struct VmConfig {
+    memory_mb: Option<u64>,
+    cpus: Option<usize>,
+}
+
+fn parse_structured_toml(content: &str) -> Option<HostProfile> {
+    let s: StructuredToml = toml::from_str(content).ok()?;
+    let h = s.host.unwrap_or(StructuredHost {
+        os: None,
+        cpu_model: None,
+        physical_cores: None,
+        logical_cores: None,
+        total_ram_mb: None,
+        total_ram_gb: None,
+        keyboard: None,
+        vbox_folder: None,
+    });
+    let v_linux = s.virtualization.as_ref().and_then(|v| v.linux.as_ref());
+    let v_win = s.virtualization.as_ref().and_then(|v| v.windows.as_ref());
+
+    let physical_cores = h.physical_cores.unwrap_or(4);
+    let logical_cores = h.logical_cores.unwrap_or(physical_cores);
+    let total_ram_gb = h.total_ram_gb.unwrap_or_else(|| {
+        h.total_ram_mb
+            .map(|mb| (mb as f64 / 1024.0).round() as u64)
+            .unwrap_or(16)
+    });
+
+    Some(HostProfile {
+        os: h.os.unwrap_or_else(|| "Linux".to_string()),
+        cpu_model: h
+            .cpu_model
+            .unwrap_or_else(|| "Unknown Processor".to_string()),
+        physical_cores,
+        logical_cores,
+        smt_active: logical_cores > physical_cores,
+        total_ram_gb,
+        keyboard: h.keyboard.unwrap_or_else(|| "es".to_string()),
+        vbox_folder: h
+            .vbox_folder
+            .unwrap_or_else(crate::hardware::detect_optimal_vbox_folder),
+        linux_cpus: v_linux.and_then(|l| l.cpus).unwrap_or(2),
+        linux_mem_mb: v_linux.and_then(|l| l.memory_mb).unwrap_or(4096),
+        windows_cpus: v_win.and_then(|w| w.cpus).unwrap_or(2),
+        windows_mem_mb: v_win.and_then(|w| w.memory_mb).unwrap_or(4096),
+    })
 }
 
 fn parse_env_file(path: &std::path::Path) -> Result<HostProfile> {

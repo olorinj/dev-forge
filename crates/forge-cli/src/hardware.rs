@@ -74,7 +74,7 @@ impl HostProfile {
     }
 }
 
-fn detect_optimal_vbox_folder() -> String {
+pub fn detect_optimal_vbox_folder() -> String {
     // Check for explicit NVMe dedicated partition on Linux
     if cfg!(target_os = "linux") && Path::new("/mnt/data").is_dir() {
         let vdir = Path::new("/mnt/data/virtualbox");

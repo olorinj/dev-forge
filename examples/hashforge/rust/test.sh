@@ -41,5 +41,15 @@ if [ "$TARGET" = "windows" ] || [ "$TARGET" = "all" ]; then
     [ ! -f "$WIN_BIN" ] && log_fail "No se generó el binario Windows en $WIN_BIN"
     file "$WIN_BIN" | grep -qi "PE32" || log_fail "No es un ejecutable PE32 válido"
     log_ok "Binario Windows verificado como PE32+ ($(stat -c %s "$WIN_BIN") bytes)"
+
+    WIN_SETUP="$DIST_DIR/hashforge-setup.exe"
+    [ ! -f "$WIN_SETUP" ] && log_fail "No se generó el instalador InnoSetup en $WIN_SETUP"
+    file "$WIN_SETUP" | grep -qi "PE32" || log_fail "El instalador InnoSetup no es un ejecutable PE32 válido"
+    log_ok "Instalador InnoSetup verificado ($(stat -c %s "$WIN_SETUP") bytes)"
+
+    WIN_MSI="$DIST_DIR/hashforge.msi"
+    [ ! -f "$WIN_MSI" ] && log_fail "No se generó el paquete WiX MSI en $WIN_MSI"
+    file "$WIN_MSI" | grep -qi "Composite Document File\|OLE 2" || log_fail "El archivo MSI no es un paquete OLE válido"
+    log_ok "Paquete WiX MSI verificado ($(stat -c %s "$WIN_MSI") bytes)"
 fi
 
