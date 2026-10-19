@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Universal Multi-Language Verification Suite (`HashForge`)**:
   - Reference implementation in `examples/hashforge/` verifying toolchain health with deterministic SHA-256 and MD5 test vectors across Rust, Python, Go, Node, Java/Android, and C/C++.
   - Dual-shell test harnesses (`test.sh` and `test.ps1`).
+  - Documented full-matrix execution commands (`all all`, per-language, and per-target) in the main `README.md`.
 
 ### Changed
 - **Windows MSVC Build Tools Provisioning**:
@@ -55,3 +56,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Air-Gapped & 100% Offline Compilation**:
   - All compiler passes run locally within guest VMs without pulling remote dependencies during build phases.
   - Target output directories isolated inside guests (`/tmp/cargo-target`, `C:\target`) and final artifacts deposited strictly into client `dist/`.
+

@@ -118,13 +118,87 @@ dev-forge halt           # Detener todas las VMs para liberar RAM
 dev-forge ssh            # Abrir terminal interactiva en forge-linux
 ```
 
-#### En Windows:
+#### En Windows (PowerShell):
 ```powershell
 .\bin\dev-forge.ps1 status         # Consultar estado de las VMs
 .\bin\dev-forge.ps1 up forge-linux # Iniciar máquina Linux
 .\bin\dev-forge.ps1 halt           # Detener todas las VMs
 .\bin\dev-forge.ps1 ssh            # Sesión SSH en Linux
 ```
+
+### 3. Validación de Salud y Pruebas del Entorno (`test-vm`)
+
+Para verificar que los toolchains, variables del kernel y enlazadores estén 100% operativos dentro de cada máquina virtual:
+
+#### En Linux / macOS:
+```bash
+dev-forge test-vm forge-linux   # Verifica servicios, kernel sysctl, tmpfs y ccache en Debian 12
+dev-forge test-vm forge-windows # Verifica toolchains (MSVC, Rust, Python, Go, Node, Java, CMake, Ninja)
+```
+
+#### En Windows:
+```powershell
+.\bin\dev-forge.ps1 test-vm forge-linux
+.\bin\dev-forge.ps1 test-vm forge-windows
+```
+
+---
+
+## 🧪 Banco de Pruebas Multi-Lenguaje (`HashForge`)
+
+`dev-forge` incluye un banco de pruebas integral en [`examples/hashforge/`](examples/hashforge/README.md) compuesto por **8 implementaciones** que calculan exactamente los mismos resúmenes criptográficos (**SHA-256** y **MD5**) sobre un vector de prueba constante (`"dev-forge test"`):
+
+- **SHA-256 esperado**: `3424cecd9bc9384046f4b97b5012cc51037a0a58cbf547642dc71dc6a0ac0825`
+- **MD5 esperado**: `253c885072f588436970bcbc0fe47b9e`
+
+### Matriz de Lenguajes Soportados en el Test
+
+| Lenguaje | Directorio | Sistema de Construcción | Salida Linux | Salida Windows / Android |
+| :--- | :--- | :--- | :--- | :--- |
+| **Rust** | [`rust/`](examples/hashforge/rust/) | Cargo | `dist/hashforge` (ELF 64-bit) | `dist/hashforge.exe` (PE32+) |
+| **Python** | [`python/`](examples/hashforge/python/) | PyInstaller / UV | `dist/hashforge-py` | `dist/hashforge-py.exe` |
+| **C (C99)** | [`c/`](examples/hashforge/c/) | CMake / OpenSSL / CryptoAPI | `dist/hashforge-c` | `dist/hashforge-c.exe` |
+| **C++ (C++17)** | [`cpp/`](examples/hashforge/cpp/) | CMake / Ninja / MSVC | `dist/hashforge-cpp` | `dist/hashforge-cpp.exe` |
+| **Go** | [`go/`](examples/hashforge/go/) | Go toolchain | `dist/hashforge-go` | `dist/hashforge-go.exe` |
+| **Java** | [`java/`](examples/hashforge/java/) | Gradle (Java 21 LTS) | `dist/hashforge-java.jar` | `dist/hashforge-java.jar` |
+| **Android** | [`android/`](examples/hashforge/android/) | Gradle (AGP / SDK 34) | N/A | `dist/*.apk` |
+| **Node.js** | [`node/`](examples/hashforge/node/) | Node.js / Web Crypto | `dist/hashforge-node.js` | `dist/hashforge-node.js` |
+
+### Ejecución de Pruebas para Todos los Lenguajes
+
+#### En Linux / macOS (Bash):
+```bash
+# Ejecutar TODOS los lenguajes en AMBAS máquinas virtuales (Linux y Windows):
+bash examples/hashforge/test.sh all all
+
+# Ejecutar TODOS los lenguajes SOLO en Linux:
+bash examples/hashforge/test.sh all linux
+
+# Ejecutar TODOS los lenguajes SOLO en Windows:
+bash examples/hashforge/test.sh all windows
+
+# Probar un lenguaje específico (ej. rust, python, go, java, c, cpp, android, node):
+bash examples/hashforge/test.sh rust linux
+bash examples/hashforge/test.sh rust windows
+bash examples/hashforge/test.sh python windows
+```
+
+#### En Windows (PowerShell):
+```powershell
+# Ejecutar TODOS los lenguajes en AMBAS máquinas virtuales:
+.\examples\hashforge\test.ps1 -Language all -Target all
+
+# Ejecutar TODOS los lenguajes SOLO en Windows:
+.\examples\hashforge\test.ps1 -Language all -Target windows
+
+# Probar un lenguaje específico:
+.\examples\hashforge\test.ps1 -Language rust -Target windows
+.\examples\hashforge\test.ps1 -Language python -Target windows
+.\examples\hashforge\test.ps1 -Language java -Target windows
+```
+
+> [!NOTE]
+> Para más detalles sobre cada lenguaje y compilación individual, consulta la [Guía Completa de HashForge](examples/hashforge/README.md).
 
 ---
 
