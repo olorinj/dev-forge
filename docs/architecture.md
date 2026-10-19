@@ -14,7 +14,7 @@ flowchart TD
 
     subgraph Proyectos_Clientes["Proyectos Clientes Externos"]
         RustP["Rust / Tauri (ej. lexishield)"]
-        JavaP["Java / Android (Gradle)"]
+        JavaP["Java (Gradle / Maven)"]
         PyP["Python (Scripts / PyInstaller)"]
         GoP["Go (CLIs / Microservicios)"]
     end
@@ -25,7 +25,7 @@ flowchart TD
         subgraph VM_Linux["forge-linux (Debian 12)"]
             L_Base["Toolchain Base (GCC, Clang, Mold, LLD)"]
             L_Rust["Rustup (GNU + Musl + Apple Darwin targets)"]
-            L_Java["OpenJDK 21 LTS + Gradle + Android Cmdline Tools"]
+            L_Java["OpenJDK 21 LTS + Gradle"]
             L_Py["Python 3.12 + Pyenv + UV + PyInstaller"]
             L_Go["Go 1.23.2 Toolchain"]
             L_Node["Node.js 20 LTS + Corepack (pnpm, yarn)"]

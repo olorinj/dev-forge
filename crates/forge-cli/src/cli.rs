@@ -106,7 +106,6 @@ pub enum TargetPlatform {
     Linux,
     Windows,
     Macos,
-    Android,
     All,
 }
 
@@ -116,7 +115,6 @@ impl std::fmt::Display for TargetPlatform {
             Self::Linux => write!(f, "linux"),
             Self::Windows => write!(f, "windows"),
             Self::Macos => write!(f, "macos"),
-            Self::Android => write!(f, "android"),
             Self::All => write!(f, "all"),
         }
     }

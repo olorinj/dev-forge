@@ -298,7 +298,7 @@ pub fn cmd_build(args: &BuildArgs) -> Result<()> {
     let envs = [("FORGE_WORKSPACE", project_str.as_str())];
 
     match args.target {
-        TargetPlatform::Linux | TargetPlatform::Android | TargetPlatform::Macos => {
+        TargetPlatform::Linux | TargetPlatform::Macos => {
             build_on_linux(&ptype, args, &envs)?;
         }
         TargetPlatform::Windows => {
@@ -332,13 +332,14 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
         .project
         .canonicalize()
         .unwrap_or_else(|_| args.project.clone());
-    // Unmount any previous workspace inside guest before changing host shared folder
+
+    // Unmount any previous workspace inside guest cleanly
     let _ = run_vagrant_streaming(
         &[
             "ssh",
             "forge-linux",
             "-c",
-            "sudo umount -l /workspace 2>/dev/null || true",
+            "if mountpoint -q /workspace; then sudo umount /workspace 2>/dev/null || sudo umount -l /workspace 2>/dev/null || true; fi",
         ],
         envs,
     );
@@ -366,7 +367,7 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
         ])
         .output();
 
-    let mount_prefix = "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace && ";
+    let mount_prefix = "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace && source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.local/bin:$PATH\"; ";
 
     let clean_cmd = if args.clean {
         "rm -rf /tmp/cargo-target/* /tmp/go-cache/* /tmp/build/* 2>/dev/null || true; "
@@ -385,15 +386,15 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
         ),
         ProjectType::Python(details) => match details.manager {
             PythonManager::Uv => format!(
-                "{}cd /workspace && uv build --out-dir /workspace/dist/",
+                "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else uv build --out-dir /workspace/dist/; fi",
                 clean_cmd
             ),
             PythonManager::Poetry => format!(
-                "{}cd /workspace && poetry build && cp -r dist/* /workspace/dist/",
+                "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else poetry build && cp -r dist/* /workspace/dist/; fi",
                 clean_cmd
             ),
             PythonManager::Pipenv => format!(
-                "{}cd /workspace && pipenv run python3 -m build -o /workspace/dist/",
+                "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else pipenv run python3 -m build -o /workspace/dist/; fi",
                 clean_cmd
             ),
             PythonManager::Pip => {
@@ -401,22 +402,18 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
                     format!("{}cd /workspace && tox", clean_cmd)
                 } else {
                     format!(
-                        "{}cd /workspace && python3 -m build -o /workspace/dist/ 2>/dev/null || python3 -m pip wheel . -w /workspace/dist/",
+                        "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else python3 -m build -o /workspace/dist/ 2>/dev/null || python3 -m pip wheel . -w /workspace/dist/; fi",
                         clean_cmd
                     )
                 }
             }
         },
-        ProjectType::JavaAndroid => format!(
-            "{}cd /workspace && chmod +x ./gradlew 2>/dev/null || true; ./gradlew assembleRelease && cp app/build/outputs/apk/release/*.apk /workspace/dist/ 2>/dev/null || true",
-            clean_cmd
-        ),
         ProjectType::Java => format!(
-            "{}cd /workspace && chmod +x ./gradlew 2>/dev/null || true; (./gradlew build || mvn package) && cp build/libs/*.jar target/*.jar /workspace/dist/ 2>/dev/null || true",
+            "{}cd /workspace && chmod +x ./gradlew 2>/dev/null || true; (if [ -f ./gradlew ]; then ./gradlew build; elif [ -f pom.xml ]; then mvn package; else gradle build; fi) && find build/libs/ target/ -name '*.jar' ! -name '*-plain.jar' -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true",
             clean_cmd
         ),
         ProjectType::Go => format!(
-            "{}cd /workspace && GOCACHE=/tmp/go-cache go build -o /workspace/dist/",
+            "{}cd /workspace && GOCACHE=/tmp/go-cache go build -o /workspace/dist/hashforge-go . 2>/dev/null || GOCACHE=/tmp/go-cache go build -o /workspace/dist/ .",
             clean_cmd
         ),
         ProjectType::Node => format!(
@@ -424,7 +421,7 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
             clean_cmd
         ),
         ProjectType::CCpp => format!(
-            "{}mkdir -p /tmp/build && cd /workspace && cmake -B /tmp/build -S . -G Ninja && cmake --build /tmp/build && cp -r /tmp/build/bin/* /workspace/dist/ 2>/dev/null || true",
+            "{}rm -rf /tmp/build && mkdir -p /tmp/build && cd /workspace && cmake -B /tmp/build -S . -G Ninja && cmake --build /tmp/build && find /tmp/build -maxdepth 2 -type f -executable ! -name '*.ninja*' ! -name '*.cmake' -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true",
             clean_cmd
         ),
         ProjectType::Generic => format!(
@@ -441,7 +438,7 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
             "ssh",
             "forge-linux",
             "-c",
-            "sudo umount -l /workspace 2>/dev/null || true",
+            "if mountpoint -q /workspace; then sudo umount /workspace 2>/dev/null || sudo umount -l /workspace 2>/dev/null || true; fi",
         ],
         envs,
     );
@@ -504,17 +501,23 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
         ""
     };
 
+    let vs_shell_init = "if (Test-Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1') { & 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 | Out-Null }; ";
+
     let build_ps = match ptype {
         ProjectType::Rust | ProjectType::RustTauri => format!(
             "{}{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force",
             link_ps, clean_ps
         ),
-        ProjectType::CCpp => format!(
-            "{}{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Copy-Item C:\\target\\*.exe C:\\workspace\\dist\\ -Force",
+        ProjectType::Python(_) => format!(
+            "{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; if (Test-Path main.py) {{ python -m PyInstaller --clean -F --name hashforge-py main.py --distpath C:\\workspace\\dist 2>&1 | Out-Host; if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}",
             link_ps, clean_ps
         ),
+        ProjectType::CCpp => format!(
+            "{}{}{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Copy-Item -Destination C:\\workspace\\dist\\ -Force",
+            link_ps, clean_ps, vs_shell_init
+        ),
         ProjectType::Go => format!(
-            "{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; go build -o C:\\workspace\\dist\\",
+            "{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; go build -o C:\\workspace\\dist\\hashforge-go.exe . ; if (-not (Test-Path C:\\workspace\\dist\\hashforge-go.exe)) {{ go build -o C:\\workspace\\dist\\ . }}",
             link_ps, clean_ps
         ),
         _ => format!(

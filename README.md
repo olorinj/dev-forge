@@ -2,7 +2,7 @@
 
 > **Forja Universal de Compilación y Desarrollo Multiplataforma (100% Offline)**
 
-`dev-forge` es un orquestador autónomo diseñado para compilar y empaquetar aplicaciones en múltiples lenguajes (**Rust, Java, Android, Python, Go, Node.js y C/C++**) hacia múltiples plataformas (**Linux, Windows nativo con MSVC y macOS**) mediante entornos virtualizados limpios y aislados, sin requerir conexión a internet obligatoria ni contaminar el sistema operativo anfitrión.
+`dev-forge` es un orquestador autónomo diseñado para compilar y empaquetar aplicaciones en múltiples lenguajes (**Rust, Java, Python, Go, Node.js y C/C++**) hacia múltiples plataformas (**Linux, Windows nativo con MSVC y macOS**) mediante entornos virtualizados limpios y aislados, sin requerir conexión a internet obligatoria ni contaminar el sistema operativo anfitrión.
 
 ---
 
@@ -11,7 +11,7 @@
 ```mermaid
 flowchart LR
     Proyecto["📁 Cualquier Proyecto Cliente<br/>(Rust / Java / Python / Go)"] --> CLI["⚡ dev-forge CLI"]
-    CLI --> LinuxVM["🐧 forge-linux<br/>(Linux / macOS / Android)"]
+    CLI --> LinuxVM["🐧 forge-linux<br/>(Linux / macOS)"]
     CLI --> WinVM["🪟 forge-windows<br/>(MSVC / WiX / InnoSetup)"]
     LinuxVM --> Dist["📦 dist/<br/>(Binarios generados)"]
     WinVM --> Dist
@@ -24,7 +24,7 @@ flowchart LR
 - **🎯 100% Offline**: Ejecución y empaquetado directo en local sin depender de GitHub Actions ni subir código a la nube.
 - **🌐 Soporte Multi-Lenguaje Nativo**:
   - **Rust**: Soporte completo para aplicaciones CLI y GUIs en Tauri.
-  - **Java & Android**: OpenJDK 21 LTS, Gradle y compilación de paquetes móviles APK/AAB.
+  - **Java**: OpenJDK 21 LTS y Gradle.
   - **Python**: Empaquetado en ejecutables independientes con PyInstaller y gestión con UV.
   - **Go**: Binarios estáticos de alto rendimiento.
   - **C / C++**: GCC, Clang, CMake y MSVC nativo con enlazado criptográfico del sistema.
@@ -89,8 +89,8 @@ El orquestador ofrece paridad total de comandos en ambos shells:
 # Compilar proyecto en Rust o Tauri hacia todos los destinos
 dev-forge build --project /ruta/a/mi-proyecto --target all
 
-# Compilar proyecto Java hacia Android (APK)
-dev-forge build --project /ruta/a/mi-app-android --target android
+# Compilar proyecto en Java (JAR)
+dev-forge build --project /ruta/a/mi-app-java --target linux
 
 # Compilar script Python en un ejecutable Windows PE32+
 dev-forge build --project /ruta/a/mi-script --target windows
@@ -101,8 +101,8 @@ dev-forge build --project /ruta/a/mi-script --target windows
 # Compilar proyecto en Rust o Tauri hacia todos los destinos
 .\bin\dev-forge.ps1 build -p C:\proyectos\mi-proyecto -t all
 
-# Compilar proyecto Java hacia Android (APK)
-.\bin\dev-forge.ps1 build -p C:\proyectos\mi-app-android -t android
+# Compilar proyecto en Java (JAR)
+.\bin\dev-forge.ps1 build -p C:\proyectos\mi-app-java -t linux
 
 # Compilar ejecutable nativo Windows con MSVC
 .\bin\dev-forge.ps1 build -p C:\proyectos\mi-script -t windows
@@ -146,14 +146,14 @@ dev-forge test-vm forge-windows # Verifica toolchains (MSVC, Rust, Python, Go, N
 
 ## 🧪 Banco de Pruebas Multi-Lenguaje (`HashForge`)
 
-`dev-forge` incluye un banco de pruebas integral en [`examples/hashforge/`](examples/hashforge/README.md) compuesto por **8 implementaciones** que calculan exactamente los mismos resúmenes criptográficos (**SHA-256** y **MD5**) sobre un vector de prueba constante (`"dev-forge test"`):
+`dev-forge` incluye un banco de pruebas integral en [`examples/hashforge/`](examples/hashforge/README.md) compuesto por **7 implementaciones** que calculan exactamente los mismos resúmenes criptográficos (**SHA-256** y **MD5**) sobre un vector de prueba constante (`"dev-forge test"`):
 
 - **SHA-256 esperado**: `3424cecd9bc9384046f4b97b5012cc51037a0a58cbf547642dc71dc6a0ac0825`
 - **MD5 esperado**: `253c885072f588436970bcbc0fe47b9e`
 
 ### Matriz de Lenguajes Soportados en el Test
 
-| Lenguaje | Directorio | Sistema de Construcción | Salida Linux | Salida Windows / Android |
+| Lenguaje | Directorio | Sistema de Construcción | Salida Linux | Salida Windows |
 | :--- | :--- | :--- | :--- | :--- |
 | **Rust** | [`rust/`](examples/hashforge/rust/) | Cargo | `dist/hashforge` (ELF 64-bit) | `dist/hashforge.exe` (PE32+) |
 | **Python** | [`python/`](examples/hashforge/python/) | PyInstaller / UV | `dist/hashforge-py` | `dist/hashforge-py.exe` |
@@ -161,7 +161,6 @@ dev-forge test-vm forge-windows # Verifica toolchains (MSVC, Rust, Python, Go, N
 | **C++ (C++17)** | [`cpp/`](examples/hashforge/cpp/) | CMake / Ninja / MSVC | `dist/hashforge-cpp` | `dist/hashforge-cpp.exe` |
 | **Go** | [`go/`](examples/hashforge/go/) | Go toolchain | `dist/hashforge-go` | `dist/hashforge-go.exe` |
 | **Java** | [`java/`](examples/hashforge/java/) | Gradle (Java 21 LTS) | `dist/hashforge-java.jar` | `dist/hashforge-java.jar` |
-| **Android** | [`android/`](examples/hashforge/android/) | Gradle (AGP / SDK 34) | N/A | `dist/*.apk` |
 | **Node.js** | [`node/`](examples/hashforge/node/) | Node.js / Web Crypto | `dist/hashforge-node.js` | `dist/hashforge-node.js` |
 
 ### Ejecución de Pruebas para Todos los Lenguajes
@@ -177,7 +176,7 @@ bash examples/hashforge/test.sh all linux
 # Ejecutar TODOS los lenguajes SOLO en Windows:
 bash examples/hashforge/test.sh all windows
 
-# Probar un lenguaje específico (ej. rust, python, go, java, c, cpp, android, node):
+# Probar un lenguaje específico (ej. rust, python, go, java, c, cpp, node):
 bash examples/hashforge/test.sh rust linux
 bash examples/hashforge/test.sh rust windows
 bash examples/hashforge/test.sh python windows

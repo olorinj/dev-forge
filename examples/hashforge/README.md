@@ -11,7 +11,7 @@ flowchart TD
     end
 
     subgraph VMs["Entornos de Compilación Desacoplados"]
-        LinuxVM["forge-linux (Debian 12)\nGCC, Clang, Rustup, Go, Python/PyInstaller, OpenJDK 21, Android SDK"]
+        LinuxVM["forge-linux (Debian 12)\nGCC, Clang, Rustup, Go, Python/PyInstaller, OpenJDK 21"]
         WinVM["forge-windows (Windows 11)\nMSVC 2022, Rust MSVC, Go Win, Python/PyInstaller, OpenJDK 21"]
     end
 
@@ -22,16 +22,14 @@ flowchart TD
         L_Cpp["C++ (C++17 / CMake / OpenSSL & CryptoAPI)"]
         L_Go["Go (CLI / standard library crypto)"]
         L_Java["Java (CLI + GUI Swing / Gradle JAR)"]
-        L_Droid["Android (Mobile App / Gradle APK)"]
         L_Node["Node.js / Web (CLI + Web GUI / Web Crypto & crypto)"]
     end
 
     CLI --> Lenguajes
     Lenguajes -->|Target: linux| LinuxVM
     Lenguajes -->|Target: windows| WinVM
-    Lenguajes -->|Target: android| LinuxVM
 
-    LinuxVM -->|ELF nativo / JAR / APK / JS Bundle| Dist["dist/ (Binarios finales)"]
+    LinuxVM -->|ELF nativo / JAR / JS Bundle| Dist["dist/ (Binarios finales)"]
     WinVM -->|PE32+ .exe / JAR / JS Bundle| Dist
 ```
 
@@ -39,7 +37,7 @@ flowchart TD
 
 ## 1. Implementaciones Disponibles
 
-| Directorio | Lenguaje | GUI / CLI | Sistema de Construcción | Binario Linux | Binario Windows / Android |
+| Directorio | Lenguaje | GUI / CLI | Sistema de Construcción | Binario Linux | Binario Windows |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | [`rust/`](rust/) | **Rust 2021** | CLI + GUI (`egui`/`eframe`) | Cargo | `dist/hashforge` | `dist/hashforge.exe` |
 | [`python/`](python/) | **Python 3.12** | CLI + GUI (`tkinter`) | PyInstaller standalone | `dist/hashforge-py` | `dist/hashforge-py.exe` |
@@ -47,7 +45,6 @@ flowchart TD
 | [`cpp/`](cpp/) | **C++ (C++17)** | CLI | CMake / Makefile | `dist/hashforge-cpp` | `dist/hashforge-cpp.exe` |
 | [`go/`](go/) | **Go 1.23** | CLI | Go toolchain (`go build`) | `dist/hashforge-go` | `dist/hashforge-go.exe` |
 | [`java/`](java/) | **Java 21 LTS** | CLI + GUI (`Swing`) | Gradle (`java`/`application`) | `dist/hashforge-java.jar` | `dist/hashforge-java.jar` |
-| [`android/`](android/) | **Android (Java/SDK 34)** | App Móvil Nativa | Android Gradle Plugin (AGP) | N/A | `dist/*.apk` |
 | [`node/`](node/) | **Node.js 20 LTS / Web** | CLI + Web GUI | Vanilla JS / Web Crypto & `crypto` | `dist/hashforge-node.js`, `dist/index.html` | `dist/hashforge-node.js`, `dist/index.html` |
 
 ---
@@ -73,9 +70,6 @@ dev-forge build -p examples/hashforge/go -t all
 # Compilar Java (genera paquete JAR autocontenido para Linux y Windows)
 dev-forge build -p examples/hashforge/java -t all
 
-# Compilar App Móvil Android (genera paquete APK)
-dev-forge build -p examples/hashforge/android -t android
-
 # Empaquetar Node.js / Web (CLI + Web GUI estática para dist/)
 dev-forge build -p examples/hashforge/node -t all
 ```
@@ -95,7 +89,6 @@ Cada subcarpeta de lenguaje contiene su propio `test.sh` y `test.ps1`. Adicional
 ./test.sh cpp linux
 ./test.sh go linux
 ./test.sh java linux
-./test.sh android android
 ./test.sh node linux
 
 # Probar un lenguaje específico en forge-windows:
@@ -113,7 +106,6 @@ Cada subcarpeta de lenguaje contiene su propio `test.sh` y `test.ps1`. Adicional
 .\test.ps1 -Language rust -Target windows
 .\test.ps1 -Language python -Target windows
 .\test.ps1 -Language java -Target windows
-.\test.ps1 -Language android -Target android
 .\test.ps1 -Language node -Target windows
 
 # Probar TODOS los lenguajes en AMBAS VMs:

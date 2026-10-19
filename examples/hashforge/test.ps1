@@ -1,4 +1,4 @@
-﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 param(
@@ -18,7 +18,7 @@ Write-Host ""
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $languages = if ($Language -eq "all") {
-    @("rust", "python", "c", "cpp", "go", "java", "android", "node")
+    @("rust", "python", "c", "cpp", "go", "java", "node")
 } else {
     @($Language)
 }

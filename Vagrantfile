@@ -85,17 +85,13 @@ Vagrant.configure("2") do |config|
   end
 
   # ===========================================================================
-  # 1. MAQUINA LINUX (Para Linux nativo, Android, y macOS cruzado con Docker)
+  # 1. MAQUINA LINUX (Para Linux nativo y macOS cruzado con Docker)
   # ===========================================================================
   config.vm.define "forge-linux" do |linux|
     linux.vm.box = "bento/debian-12"
     linux.vm.hostname = "forge-linux"
+    # Carpeta del proyecto dev-forge
     linux.vm.synced_folder ".", "/forge", mount_options: ["dmode=775", "fmode=775"]
-
-    # Carpeta de workspace dinámica para el proyecto cliente si se define FORGE_WORKSPACE
-    if ENV["FORGE_WORKSPACE"] && File.directory?(ENV["FORGE_WORKSPACE"])
-      linux.vm.synced_folder ENV["FORGE_WORKSPACE"], "/workspace", mount_options: ["dmode=775", "fmode=775"]
-    end
 
     linux.vm.provider "virtualbox" do |vb|
       vb.name = "FORGE-LINUX"
@@ -121,7 +117,7 @@ Vagrant.configure("2") do |config|
     linux.vm.provision "shell", path: "provision/linux/20-python.sh"
     linux.vm.provision "shell", path: "provision/linux/30-go.sh"
     linux.vm.provision "shell", path: "provision/linux/40-node.sh"
-    linux.vm.provision "shell", path: "provision/linux/50-java-android.sh"
+    linux.vm.provision "shell", path: "provision/linux/50-java.sh"
     linux.vm.provision "shell", path: "provision/linux/60-macos-cross.sh"
   end
 
@@ -135,12 +131,8 @@ Vagrant.configure("2") do |config|
     win.vm.communicator = "winrm"
     win.winrm.retry_limit = 60
     win.winrm.retry_delay = 10
+    # Carpeta del proyecto dev-forge
     win.vm.synced_folder ".", "c:/forge"
-
-    # Carpeta de workspace dinámica para el proyecto cliente en Windows
-    if ENV["FORGE_WORKSPACE"] && File.directory?(ENV["FORGE_WORKSPACE"])
-      win.vm.synced_folder ENV["FORGE_WORKSPACE"], "c:/workspace"
-    end
 
     win.vm.provider "virtualbox" do |vb|
       vb.name = "FORGE-WINDOWS"

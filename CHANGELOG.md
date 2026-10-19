@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Multi-level optimization suite (`optimize-level2-recommended.ps1`) configuring Windows Defender compilation exclusions, filesystem optimizations, and WinRM quotas.
   - Automated guest health-check validation (`provision/windows/health-check.ps1`, 9/9 checks passing).
 - **Universal Multi-Language Verification Suite (`HashForge`)**:
-  - Reference implementation in `examples/hashforge/` verifying toolchain health with deterministic SHA-256 and MD5 test vectors across Rust, Python, Go, Node, Java/Android, and C/C++.
+  - Reference implementation in `examples/hashforge/` verifying toolchain health with deterministic SHA-256 and MD5 test vectors across Rust, Python, Go, Node, Java, and C/C++.
   - Dual-shell test harnesses (`test.sh` and `test.ps1`).
   - Documented full-matrix execution commands (`all all`, per-language, and per-target) in the main `README.md`.
 

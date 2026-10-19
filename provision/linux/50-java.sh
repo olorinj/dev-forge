@@ -3,7 +3,7 @@ set -e
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "=== [dev-forge : Linux] 50-java-android: Configurando repositorio de OpenJDK 21 LTS ==="
+echo "=== [dev-forge : Linux] 50-java: Configurando repositorio de OpenJDK 21 LTS ==="
 
 # 1. Configurar repositorio oficial de Adoptium (Eclipse Temurin) para Debian 12 (Bookworm)
 apt-get install -y --no-install-recommends gnupg curl ca-certificates
@@ -40,7 +40,7 @@ export PATH="\$JAVA_HOME/bin:\$PATH"
 EOF
 chmod +x /etc/profile.d/java.sh
 
-# 5. Instalar Gradle moderno (v8.10.2) compatible con Java 21 y Android Gradle Plugin
+# 5. Instalar Gradle moderno (v8.10.2)
 GRADLE_VER="8.10.2"
 if ! command -v gradle >/dev/null 2>&1 || [[ "$(gradle -v 2>/dev/null)" != *"$GRADLE_VER"* ]]; then
   echo "Instalando Gradle ${GRADLE_VER}..."
@@ -50,35 +50,5 @@ if ! command -v gradle >/dev/null 2>&1 || [[ "$(gradle -v 2>/dev/null)" != *"$GR
   ln -sf "/opt/gradle-${GRADLE_VER}/bin/gradle" /usr/local/bin/gradle
 fi
 
-# 6. Configurar Android SDK Command-Line Tools
-ANDROID_ROOT="/opt/android-sdk"
-mkdir -p "$ANDROID_ROOT/cmdline-tools"
+echo "=== [dev-forge : Linux] 50-java: Java $(java -version 2>&1 | head -n 1) y Gradle $(gradle -v 2>&1 | grep Gradle | head -n 1) listos ==="
 
-if [ ! -d "$ANDROID_ROOT/cmdline-tools/latest" ]; then
-  echo "Descargando Android Command-Line Tools..."
-  curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o /tmp/cmdline-tools.zip
-  unzip -q -o /tmp/cmdline-tools.zip -d /tmp/android-tools
-  mkdir -p "$ANDROID_ROOT/cmdline-tools/latest"
-  cp -r /tmp/android-tools/cmdline-tools/* "$ANDROID_ROOT/cmdline-tools/latest/"
-  rm -rf /tmp/cmdline-tools.zip /tmp/android-tools
-fi
-
-cat << EOF > /etc/profile.d/android.sh
-export ANDROID_HOME="$ANDROID_ROOT"
-export ANDROID_SDK_ROOT="$ANDROID_ROOT"
-export PATH="\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$PATH"
-EOF
-chmod +x /etc/profile.d/android.sh
-
-export ANDROID_HOME="$ANDROID_ROOT"
-export PATH="$ANDROID_ROOT/cmdline-tools/latest/bin:$PATH"
-
-if command -v sdkmanager >/dev/null 2>&1; then
-  echo "Aceptando licencias de Android y verificando plataformas requeridas..."
-  yes | sdkmanager --licenses >/dev/null 2>&1 || true
-  yes | sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null 2>&1 || true
-fi
-
-chown -R vagrant:vagrant "$ANDROID_ROOT" 2>/dev/null || true
-
-echo "=== [dev-forge : Linux] 50-java-android: Java $(java -version 2>&1 | head -n 1) y Gradle $(gradle -v 2>&1 | grep Gradle | head -n 1) listos ==="

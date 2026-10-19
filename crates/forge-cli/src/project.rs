@@ -31,7 +31,6 @@ pub enum ProjectType {
     RustTauri,
     Rust,
     Python(PythonDetails),
-    JavaAndroid,
     Java,
     Go,
     Node,
@@ -56,7 +55,6 @@ impl std::fmt::Display for ProjectType {
                     write!(f, "Python (Manager: {})", details.manager)
                 }
             }
-            Self::JavaAndroid => write!(f, "Java / Kotlin (Android)"),
             Self::Java => write!(f, "Java (Gradle / Maven)"),
             Self::Go => write!(f, "Go"),
             Self::Node => write!(f, "Node.js (JavaScript / TypeScript)"),
@@ -78,26 +76,12 @@ pub fn detect_project_type(path: &Path) -> ProjectType {
         return ProjectType::Rust;
     }
 
-    // 2. Java / Android
+    // 2. Java (Gradle / Maven)
     if path.join("build.gradle").is_file()
         || path.join("build.gradle.kts").is_file()
         || path.join("gradlew").is_file()
+        || path.join("pom.xml").is_file()
     {
-        let is_android = path.join("app/src/main").is_dir()
-            || std::fs::read_to_string(path.join("build.gradle"))
-                .map(|s| s.contains("com.android"))
-                .unwrap_or(false)
-            || std::fs::read_to_string(path.join("build.gradle.kts"))
-                .map(|s| s.contains("com.android"))
-                .unwrap_or(false);
-
-        if is_android {
-            return ProjectType::JavaAndroid;
-        }
-        return ProjectType::Java;
-    }
-
-    if path.join("pom.xml").is_file() {
         return ProjectType::Java;
     }
 
