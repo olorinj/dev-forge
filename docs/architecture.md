@@ -101,6 +101,13 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
   - **Windows**: `CARGO_TARGET_DIR=C:\target` (en disco nativo NTFS).
 - Al finalizar la compilación, únicamente los binarios y librerías finales (`.exe`, `.dll`, ejecutables ELF, `.so`) son copiados al directorio `dist/` montado en el host.
 
+### 4.4 Empaquetado Automático y Vinculación Universal de Iconos (Windows)
+- Tras depositar los ejecutables en `dist/`, el script [`provision/windows/package-artifacts.ps1`](../provision/windows/package-artifacts.ps1) se dispara automáticamente:
+  - **Detección de Iconos**: Busca `.ico` en rutas estándar (`assets/`, `icons/`, `src-tauri/icons/`, `resources/`, raíz). Si solo existe un `.png`, ejecuta [`provision/windows/convert-icon.py`](../provision/windows/convert-icon.py) para generar un `.ico` multi-capa (`16x16` a `256x256`) sin intervención del usuario.
+  - **Inno Setup (`<app>-setup.exe`)**: Genera el manifiesto `.iss`, compila con `ISCC.exe`, aplica `SetupIconFile`, instala el `.ico` en `{app}` y asocia los accesos directos.
+  - **WiX Toolset (`<app>.msi`)**: Genera el archivo `.wxs` con GUIDs deterministas, compila con `candle.exe` y enlaza con `light.exe -sval -spdb`, registrando la propiedad `ARPPRODUCTICON` para el panel de desinstalación de Windows y accesos directos.
+  - **Compiladores (PyInstaller)**: Inyecta dinámicamente `--icon <ruta_ico>` en la generación del binario principal.
+
 ---
 
 ## 5. Ergonomía del Entorno y Estabilidad Operativa

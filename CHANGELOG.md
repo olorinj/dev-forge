@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-10-19
 
 ### Added
+- **Automated Windows Packaging Engine (Inno Setup & WiX MSI)**:
+  - Automatically compiles standalone `.exe` binaries into Inno Setup installers (`<app>-setup.exe` with solid `lzma2` compression) and corporate Windows Installer packages (`<app>.msi` via WiX Toolset v3.14 `candle.exe` and `light.exe`) deposited directly into `dist/`.
+  - Implemented in `provision/windows/package-artifacts.ps1` and triggered seamlessly across both Rust CLI (`crates/forge-cli/src/vagrant.rs`) and Python engine (`dev_forge/vagrant.py`).
+  - Added WiX Toolset (`candle.exe`, `light.exe`) and Inno Setup (`ISCC.exe`) assertions to `provision/windows/health-check.ps1` (12/12 checks passing).
+- **Universal Application Icon Discovery & Binding**:
+  - Auto-detects project icons (`.ico` or `.png`) across prioritized standard locations (`assets/`, `icons/`, `src-tauri/icons/`, `resources/`, workspace root).
+  - Implemented `provision/windows/convert-icon.py` providing automatic multi-resolution PNG-to-ICO conversion fallback (`16x16` up to `256x256`) when only PNG images exist.
+  - Automatically binds discovered icons to Inno Setup installers (`SetupIconFile`, `{app}\app.ico`, and desktop/start-menu shortcuts).
+  - Automatically binds discovered icons to WiX MSI packages (`<Icon Id="AppIcon">`, `ARPPRODUCTICON` registry for Windows Programs & Features, and advertised shortcuts).
+  - Injects `--icon` CLI parameter automatically into PyInstaller compilation passes.
 - **Native Rust Orchestrator CLI (`dev-forge`)**:
   - Implemented standalone, type-safe Rust binary in `crates/forge-cli` replacing ~1,150 lines of duplicate shell scripts.
   - Subcommands: `tune`, `status`, `up`, `halt`, `provision`, `ssh`, `build`, `test-vm`, and `completions`.

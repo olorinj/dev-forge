@@ -163,15 +163,18 @@ dev-forge test-vm forge-windows # Verifica toolchains (MSVC, Rust, Python, Go, N
 
 ### Matriz de Lenguajes Soportados en el Test
 
-| Lenguaje | Directorio | Sistema de Construcción | Salida Linux | Salida Windows |
+| Lenguaje | Directorio | Sistema de Construcción | Salida Linux | Salida Windows (Binario + Setup + MSI) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Rust** | [`rust/`](examples/hashforge/rust/) | Cargo | `dist/hashforge` (ELF 64-bit) | `dist/hashforge.exe` (PE32+) |
-| **Python** | [`python/`](examples/hashforge/python/) | PyInstaller / UV | `dist/hashforge-py` | `dist/hashforge-py.exe` |
-| **C (C99)** | [`c/`](examples/hashforge/c/) | CMake / OpenSSL / CryptoAPI | `dist/hashforge-c` | `dist/hashforge-c.exe` |
-| **C++ (C++17)** | [`cpp/`](examples/hashforge/cpp/) | CMake / Ninja / MSVC | `dist/hashforge-cpp` | `dist/hashforge-cpp.exe` |
-| **Go** | [`go/`](examples/hashforge/go/) | Go toolchain | `dist/hashforge-go` | `dist/hashforge-go.exe` |
+| **Rust** | [`rust/`](examples/hashforge/rust/) | Cargo | `dist/hashforge` (ELF 64-bit) | `dist/hashforge.exe` + `-setup.exe` + `.msi` |
+| **Python** | [`python/`](examples/hashforge/python/) | PyInstaller / UV | `dist/hashforge-py` | `dist/hashforge-py.exe` + `-setup.exe` + `.msi` |
+| **C (C99)** | [`c/`](examples/hashforge/c/) | CMake / OpenSSL / CryptoAPI | `dist/hashforge-c` | `dist/hashforge-c.exe` + `-setup.exe` + `.msi` |
+| **C++ (C++17)** | [`cpp/`](examples/hashforge/cpp/) | CMake / Ninja / MSVC | `dist/hashforge-cpp` | `dist/hashforge-cpp.exe` + `-setup.exe` + `.msi` |
+| **Go** | [`go/`](examples/hashforge/go/) | Go toolchain | `dist/hashforge-go` | `dist/hashforge-go.exe` + `-setup.exe` + `.msi` |
 | **Java** | [`java/`](examples/hashforge/java/) | Gradle (Java 21 LTS) | `dist/hashforge-java.jar` | `dist/hashforge-java.jar` |
 | **Node.js** | [`node/`](examples/hashforge/node/) | Node.js / Web Crypto | `dist/hashforge-node.js` | `dist/hashforge-node.js` |
+
+> [!TIP]
+> **Empaquetado e Iconos Automáticos en Windows**: En cada compilación para Windows, `dev-forge` detecta automáticamente si el proyecto tiene un icono (`.ico` o `.png`, con conversión automática a ICO multi-resolución) y genera simultáneamente en `dist/` el ejecutable autónomo (`.exe`), el instalador ejecutable Inno Setup (`<app>-setup.exe`) y el paquete corporativo Windows Installer (`<app>.msi`), vinculando el icono a accesos directos y al desinstalador de Windows.
 
 ### Ejecución de Pruebas para Todos los Lenguajes
 
