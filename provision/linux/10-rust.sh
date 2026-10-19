@@ -33,6 +33,23 @@ if ! command -v sccache >/dev/null 2>&1; then
   rm -rf /tmp/sccache*
 fi
 
+# Instalar cargo-binstall para descargas ultra-rápidas de binarios sin compilar de fuentes
+if ! command -v cargo-binstall >/dev/null 2>&1; then
+  echo "Instalando cargo-binstall..."
+  curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash 2>/dev/null || true
+  cp /root/.cargo/bin/cargo-binstall /usr/local/bin/ 2>/dev/null || true
+  su - vagrant -c 'curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash' 2>/dev/null || true
+fi
+
+# Instalar CLI de Tauri precompilado (cargo-tauri)
+if ! command -v cargo-tauri >/dev/null 2>&1; then
+  echo "Instalando binario oficial precompilado de cargo-tauri..."
+  /root/.cargo/bin/cargo-binstall -y --no-confirm tauri-cli 2>/dev/null || true
+  su - vagrant -c 'cargo-binstall -y --no-confirm tauri-cli' 2>/dev/null || true
+  ln -sf /root/.cargo/bin/cargo-tauri /usr/local/bin/cargo-tauri 2>/dev/null || true
+  ln -sf /home/vagrant/.cargo/bin/cargo-tauri /usr/local/bin/cargo-tauri 2>/dev/null || true
+fi
+
 # Configurar enlazador ultrarrápido 'mold'
 mkdir -p /home/vagrant/.cargo /root/.cargo
 cat << 'EOF' > /home/vagrant/.cargo/config.toml

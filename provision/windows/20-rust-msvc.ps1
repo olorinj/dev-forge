@@ -33,5 +33,24 @@ if ($env:PATH -notlike "*$cargoBin*") {
     $env:PATH = "$cargoBin;$env:PATH"
 }
 
+# Instalar cargo-binstall y tauri-cli precompilado
+if (-not (Get-Command cargo-binstall.exe -ErrorAction SilentlyContinue)) {
+    Write-Host "Instalando cargo-binstall para Windows..." -ForegroundColor Gray
+    try {
+        & curl.exe -sSfL "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.ps1" -o "$env:TEMP\install-binstall.ps1"
+        & powershell.exe -ExecutionPolicy Bypass -File "$env:TEMP\install-binstall.ps1"
+        Remove-Item -Force "$env:TEMP\install-binstall.ps1" -ErrorAction SilentlyContinue
+    } catch {
+        Write-Warning "No se pudo instalar cargo-binstall: $_"
+    }
+}
+
+if (-not (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue)) {
+    Write-Host "Instalando binario oficial de tauri-cli..." -ForegroundColor Gray
+    if (Get-Command cargo-binstall.exe -ErrorAction SilentlyContinue) {
+        & cargo-binstall.exe -y --no-confirm tauri-cli 2>&1 | Write-Host
+    }
+}
+
 Write-Host "=== [dev-forge : Windows] 20-rust-msvc: Rust $(rustc --version) listo ===" -ForegroundColor Green
 

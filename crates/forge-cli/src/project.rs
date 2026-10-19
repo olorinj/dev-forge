@@ -172,6 +172,190 @@ fn detect_python_details(path: &Path) -> PythonDetails {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectVersionInfo {
+    pub raw: String,
+    pub display: String,
+    pub wix: String,
+    pub branch: String,
+    pub commit: String,
+}
+
+pub fn extract_project_version(path: &Path) -> ProjectVersionInfo {
+    let mut raw_version = None;
+
+    // 1. Cargo.toml
+    let cargo_path = path.join("Cargo.toml");
+    if cargo_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&cargo_path) {
+            let mut in_package = false;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    in_package = trimmed == "[package]";
+                } else if in_package && trimmed.starts_with("version") {
+                    if let Some(val) = extract_quoted_value(trimmed) {
+                        raw_version = Some(val);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. pyproject.toml
+    if raw_version.is_none() {
+        let pyproject_path = path.join("pyproject.toml");
+        if pyproject_path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&pyproject_path) {
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("version") {
+                        if let Some(val) = extract_quoted_value(trimmed) {
+                            raw_version = Some(val);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. package.json
+    if raw_version.is_none() {
+        let pkg_path = path.join("package.json");
+        if pkg_path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&pkg_path) {
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("\"version\"") {
+                        if let Some(val) = extract_quoted_value(trimmed) {
+                            raw_version = Some(val);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. CMakeLists.txt
+    if raw_version.is_none() {
+        let cmake_path = path.join("CMakeLists.txt");
+        if cmake_path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&cmake_path) {
+                for line in content.lines() {
+                    if line.contains("VERSION") && line.contains("project(") {
+                        if let Some(idx) = line.find("VERSION") {
+                            let rest = line[idx + 7..].trim_start();
+                            let ver: String = rest
+                                .chars()
+                                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                                .collect();
+                            if !ver.is_empty() {
+                                raw_version = Some(ver);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let raw = raw_version.unwrap_or_else(|| "0.1.0".to_string());
+
+    let (branch, commit) = extract_git_info(path);
+
+    let display = if !branch.is_empty() && branch != "HEAD" {
+        format!("{}-{}", raw, branch)
+    } else {
+        raw.clone()
+    };
+
+    let wix = sanitize_wix_version(&raw);
+
+    ProjectVersionInfo {
+        raw,
+        display,
+        wix,
+        branch,
+        commit,
+    }
+}
+
+fn extract_quoted_value(line: &str) -> Option<String> {
+    let parts: Vec<&str> = line.split('"').collect();
+    if parts.len() >= 3 {
+        return Some(parts[1].to_string());
+    }
+    let parts_sq: Vec<&str> = line.split('\'').collect();
+    if parts_sq.len() >= 3 {
+        return Some(parts_sq[1].to_string());
+    }
+    None
+}
+
+fn extract_git_info(path: &Path) -> (String, String) {
+    let mut branch = String::new();
+    let mut commit = String::new();
+
+    if let Ok(out) = std::process::Command::new("git")
+        .args([
+            "-C",
+            &path.to_string_lossy(),
+            "rev-parse",
+            "--abbrev-ref",
+            "HEAD",
+        ])
+        .output()
+    {
+        if out.status.success() {
+            let b = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !b.is_empty() && b != "HEAD" {
+                branch = b;
+            }
+        }
+    }
+
+    if let Ok(out) = std::process::Command::new("git")
+        .args([
+            "-C",
+            &path.to_string_lossy(),
+            "rev-parse",
+            "--short",
+            "HEAD",
+        ])
+        .output()
+    {
+        if out.status.success() {
+            commit = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        }
+    }
+
+    (branch, commit)
+}
+
+fn sanitize_wix_version(raw: &str) -> String {
+    let clean = raw.split('-').next().unwrap_or(raw);
+    let parts: Vec<&str> = clean.split('.').collect();
+    let mut nums = Vec::new();
+    for part in parts {
+        let digits: String = part.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if !digits.is_empty() {
+            nums.push(digits);
+        } else {
+            break;
+        }
+    }
+
+    while nums.len() < 3 {
+        nums.push("0".to_string());
+    }
+
+    format!("{}.{}.{}", nums[0], nums[1], nums[2])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,5 +416,39 @@ mod tests {
             }
             _ => panic!("Expected Python project"),
         }
+    }
+
+    #[test]
+    fn test_extract_project_version_cargo() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(
+            tmp.path().join("Cargo.toml"),
+            "[package]\nname = \"demo\"\nversion = \"1.2.3-rc1\"\n",
+        )
+        .unwrap();
+        let ver = extract_project_version(tmp.path());
+        assert_eq!(ver.raw, "1.2.3-rc1");
+        assert_eq!(ver.wix, "1.2.3");
+    }
+
+    #[test]
+    fn test_extract_project_version_pyproject() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(
+            tmp.path().join("pyproject.toml"),
+            "[project]\nname = \"demo-py\"\nversion = \"0.4.2\"\n",
+        )
+        .unwrap();
+        let ver = extract_project_version(tmp.path());
+        assert_eq!(ver.raw, "0.4.2");
+        assert_eq!(ver.wix, "0.4.2");
+    }
+
+    #[test]
+    fn test_sanitize_wix_version() {
+        assert_eq!(sanitize_wix_version("1.2.3"), "1.2.3");
+        assert_eq!(sanitize_wix_version("2.0.0-beta.1"), "2.0.0");
+        assert_eq!(sanitize_wix_version("42"), "42.0.0");
+        assert_eq!(sanitize_wix_version("0.1"), "0.1.0");
     }
 }

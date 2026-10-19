@@ -103,8 +103,46 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Force re-provisioning of packages in the VM prior to building",
     )
+    build_parser.add_argument(
+        "--compiler",
+        default="nuitka",
+        choices=["nuitka", "pyinstaller"],
+        help="Compiler to use for Python standalone binaries (nuitka | pyinstaller)",
+    )
+    build_parser.add_argument(
+        "--pyinstaller",
+        action="store_true",
+        help="Convenience flag to force PyInstaller for Python builds",
+    )
 
-    # 8. test-vm
+    # 8. ide
+    ide_parser = subparsers.add_parser("ide", help="Open VS Code Remote-SSH session inside VM with development profile")
+    ide_parser.add_argument(
+        "machine",
+        nargs="?",
+        default="forge-linux",
+        help="Specific VM to connect to (default: forge-linux)",
+    )
+    ide_parser.add_argument(
+        "-p",
+        "--profile",
+        default="full",
+        choices=["rust", "python", "cpp", "web", "full"],
+        help="Programming profile with pre-configured extensions and settings",
+    )
+    ide_parser.add_argument(
+        "--project",
+        type=Path,
+        default=None,
+        help="Path to workspace directory on host to bind",
+    )
+    ide_parser.add_argument(
+        "--no-launch",
+        action="store_true",
+        help="Configure SSH and environment without launching VS Code UI",
+    )
+
+    # 9. test-vm
     test_parser = subparsers.add_parser("test-vm", help="Run the in-VM health-check and verification suite")
     test_parser.add_argument(
         "machine",
@@ -146,7 +184,18 @@ def main(argv=None) -> None:
     elif args.subcommand == "ssh":
         cmd_ssh(args.machine, args.command)
     elif args.subcommand == "build":
-        cmd_build(args.project, args.target, args.clean, args.keep_vm, args.update)
+        cmd_build(
+            args.project,
+            args.target,
+            args.clean,
+            args.keep_vm,
+            args.update,
+            compiler=args.compiler,
+            pyinstaller=args.pyinstaller,
+        )
+    elif args.subcommand == "ide":
+        from dev_forge.ide import cmd_ide
+        cmd_ide(args.machine, args.profile, args.project, args.no_launch)
     elif args.subcommand == "test-vm":
         cmd_test_vm(args.machine)
     elif args.subcommand == "doctor":

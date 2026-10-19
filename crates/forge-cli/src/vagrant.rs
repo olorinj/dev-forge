@@ -1,5 +1,5 @@
-use crate::cli::{BuildArgs, TargetPlatform};
-use crate::project::{detect_project_type, ProjectType, PythonManager};
+use crate::cli::{BuildArgs, PythonCompiler, TargetPlatform};
+use crate::project::{detect_project_type, extract_project_version, ProjectType, PythonManager};
 use crate::terminal::{log_err, log_info, log_ok, log_warn};
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -281,6 +281,8 @@ pub fn cmd_build(args: &BuildArgs) -> Result<()> {
     std::fs::create_dir_all(&dist_dir)
         .with_context(|| format!("No se pudo crear carpeta dist en {:?}", dist_dir))?;
 
+    let ver_info = extract_project_version(&project_path);
+
     log_info(&format!(
         "Proyecto a compilar: {}",
         project_path.display().to_string().bold()
@@ -288,6 +290,11 @@ pub fn cmd_build(args: &BuildArgs) -> Result<()> {
     log_info(&format!(
         "Tipo de proyecto detectado: {}",
         ptype.to_string().cyan().bold()
+    ));
+    log_info(&format!(
+        "Versión detectada: {} (WiX: {})",
+        ver_info.display.cyan().bold(),
+        ver_info.wix.green()
     ));
     log_info(&format!(
         "Destino solicitado: {}",
@@ -308,6 +315,17 @@ pub fn cmd_build(args: &BuildArgs) -> Result<()> {
             build_on_linux(&ptype, args, &envs)?;
             build_on_windows(&ptype, args, &envs)?;
         }
+    }
+
+    let dist_count = std::fs::read_dir(&dist_dir)
+        .map(|entries| entries.filter_map(|e| e.ok()).count())
+        .unwrap_or(0);
+
+    if dist_count == 0 {
+        anyhow::bail!(
+            "La compilación finalizó pero no se generó ningún artefacto en '{}'",
+            dist_dir.display()
+        );
     }
 
     log_ok(&format!(
@@ -375,39 +393,52 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
         ""
     };
 
+    let ver_info = extract_project_version(&project_canonical);
+    let use_nuitka = !args.pyinstaller && args.compiler == PythonCompiler::Nuitka;
+
     let build_script = match ptype {
         ProjectType::RustTauri => format!(
-            "{}cd /workspace && cargo tauri build && cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || true",
+            "{}cd /workspace && (cargo tauri build || npx @tauri-apps/cli build || npx tauri build) && (mkdir -p /workspace/dist && (cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || cp src-tauri/target/release/$(grep -m1 name src-tauri/Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null || cp target/release/$(grep -m1 name Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null))",
             clean_cmd
         ),
         ProjectType::Rust => format!(
             "{}cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release && cp /tmp/cargo-target/release/$(grep -m1 name Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null || true",
             clean_cmd
         ),
-        ProjectType::Python(details) => match details.manager {
-            PythonManager::Uv => format!(
-                "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else uv build --out-dir /workspace/dist/; fi",
-                clean_cmd
-            ),
-            PythonManager::Poetry => format!(
-                "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else poetry build && cp -r dist/* /workspace/dist/; fi",
-                clean_cmd
-            ),
-            PythonManager::Pipenv => format!(
-                "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else pipenv run python3 -m build -o /workspace/dist/; fi",
-                clean_cmd
-            ),
-            PythonManager::Pip => {
-                if details.is_multipython {
-                    format!("{}cd /workspace && tox", clean_cmd)
-                } else {
-                    format!(
-                        "{}cd /workspace && if [ -f main.py ]; then pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; else python3 -m build -o /workspace/dist/ 2>/dev/null || python3 -m pip wheel . -w /workspace/dist/; fi",
-                        clean_cmd
-                    )
+        ProjectType::Python(details) => {
+            let py_standalone = if use_nuitka {
+                format!(
+                    "if command -v nuitka >/dev/null 2>&1; then nuitka --standalone --onefile --output-dir=/tmp/nuitka-out --product-version={} --assume-yes-for-downloads main.py -o hashforge-py && mkdir -p /workspace/dist && cp /tmp/nuitka-out/hashforge-py /workspace/dist/; else pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; fi",
+                    ver_info.wix
+                )
+            } else {
+                "pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/".to_string()
+            };
+            match details.manager {
+                PythonManager::Uv => format!(
+                    "{}cd /workspace && if [ -f main.py ]; then {}; else uv build --out-dir /workspace/dist/; fi",
+                    clean_cmd, py_standalone
+                ),
+                PythonManager::Poetry => format!(
+                    "{}cd /workspace && if [ -f main.py ]; then {}; else poetry build && cp -r dist/* /workspace/dist/; fi",
+                    clean_cmd, py_standalone
+                ),
+                PythonManager::Pipenv => format!(
+                    "{}cd /workspace && if [ -f main.py ]; then {}; else pipenv run python3 -m build -o /workspace/dist/; fi",
+                    clean_cmd, py_standalone
+                ),
+                PythonManager::Pip => {
+                    if details.is_multipython {
+                        format!("{}cd /workspace && tox", clean_cmd)
+                    } else {
+                        format!(
+                            "{}cd /workspace && if [ -f main.py ]; then {}; else python3 -m build -o /workspace/dist/ 2>/dev/null || python3 -m pip wheel . -w /workspace/dist/; fi",
+                            clean_cmd, py_standalone
+                        )
+                    }
                 }
             }
-        },
+        }
         ProjectType::Java => format!(
             "{}cd /workspace && chmod +x ./gradlew 2>/dev/null || true; (if [ -f ./gradlew ]; then ./gradlew build; elif [ -f pom.xml ]; then mvn package; else gradle build; fi) && find build/libs/ target/ -name '*.jar' ! -name '*-plain.jar' -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true",
             clean_cmd
@@ -504,15 +535,28 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
     let vs_shell_init = "if (Test-Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1') { & 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 | Out-Null }; ";
     let cache_init = "if (Test-Path C:\\forge-cache) { $env:CARGO_HOME='C:\\forge-cache\\cargo'; $env:GOMODCACHE='C:\\forge-cache\\go\\pkg\\mod'; $env:PIP_CACHE_DIR='C:\\forge-cache\\pip'; $env:GRADLE_USER_HOME='C:\\forge-cache\\gradle'; New-Item -ItemType Directory -Path C:\\forge-cache\\cargo, C:\\forge-cache\\go\\pkg\\mod, C:\\forge-cache\\pip, C:\\forge-cache\\gradle -Force | Out-Null }; ";
 
+    let ver_info = extract_project_version(&project_canonical);
+    let use_nuitka = !args.pyinstaller && args.compiler == PythonCompiler::Nuitka;
+
     let build_ps = match ptype {
         ProjectType::Rust | ProjectType::RustTauri => format!(
             "{}{}{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force",
             link_ps, clean_ps, cache_init
         ),
-        ProjectType::Python(_) => format!(
-            "{}{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; if (Test-Path main.py) {{ $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}",
-            link_ps, clean_ps, cache_init
-        ),
+        ProjectType::Python(_) => {
+            let py_compile = if use_nuitka {
+                format!(
+                    "if (Test-Path main.py) {{ $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) {{ \"--windows-icon-from-ico='$ico'\" }} else {{ '' }}; Invoke-Expression \"nuitka --standalone --onefile --output-dir=C:\\target\\nuitka-out $icoOpt --product-version='{}' --file-version='{}' --assume-yes-for-downloads main.py -o hashforge-py.exe 2>&1\" | Out-Host; if (Test-Path C:\\target\\nuitka-out\\hashforge-py.exe) {{ Copy-Item C:\\target\\nuitka-out\\hashforge-py.exe C:\\workspace\\dist\\ -Force; exit 0 }} else {{ Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} }} else {{ python -m build -o C:\\workspace\\dist }}",
+                    ver_info.wix, ver_info.wix
+                )
+            } else {
+                "if (Test-Path main.py) { $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) { \"--icon '$ico'\" } else { '' }; Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) { exit 0 } else { exit 1 } } else { python -m build -o C:\\workspace\\dist }".to_string()
+            };
+            format!(
+                "{}{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {}",
+                link_ps, clean_ps, cache_init, py_compile
+            )
+        }
         ProjectType::CCpp => format!(
             "{}{}{}{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Copy-Item -Destination C:\\workspace\\dist\\ -Force",
             link_ps, clean_ps, cache_init, vs_shell_init
@@ -527,7 +571,10 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
         ),
     };
 
-    let pack_ps = "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') { & 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' }";
+    let pack_ps = format!(
+        "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ & 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' -AppVersion '{}' -WixVersion '{}' -GitBranch '{}' }}",
+        ver_info.raw, ver_info.wix, ver_info.branch
+    );
     let full_cmd = format!("{}{}", build_ps, pack_ps);
 
     log_info("Ejecutando proceso de compilacion remota en Windows Server Core...");

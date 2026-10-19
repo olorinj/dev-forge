@@ -80,6 +80,9 @@ pub enum Commands {
         subsystem: Option<String>,
     },
 
+    /// Open VS Code Remote-SSH session inside VM with development profile
+    Ide(IdeArgs),
+
     /// Generate native shell completion scripts
     Completions {
         /// Shell type
@@ -109,6 +112,69 @@ pub struct BuildArgs {
     /// Force re-provisioning of packages in the VM prior to building
     #[arg(short, long)]
     pub update: bool,
+
+    /// Compiler to use for Python standalone binaries (nuitka | pyinstaller)
+    #[arg(long, value_enum, default_value = "nuitka")]
+    pub compiler: PythonCompiler,
+
+    /// Convenience flag to force PyInstaller for Python builds
+    #[arg(long)]
+    pub pyinstaller: bool,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PythonCompiler {
+    Nuitka,
+    Pyinstaller,
+}
+
+impl std::fmt::Display for PythonCompiler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Nuitka => write!(f, "nuitka"),
+            Self::Pyinstaller => write!(f, "pyinstaller"),
+        }
+    }
+}
+
+#[derive(Args, Debug)]
+pub struct IdeArgs {
+    /// Specific VM to connect to (default: forge-linux)
+    #[arg(default_value = "forge-linux")]
+    pub machine: String,
+
+    /// Programming profile with pre-configured extensions and settings (rust | python | cpp | web | full)
+    #[arg(short, long, value_enum, default_value = "full")]
+    pub profile: IdeProfile,
+
+    /// Path to workspace directory on host to bind (default: current directory)
+    #[arg(short = 'w', long, alias = "workspace")]
+    pub project: Option<PathBuf>,
+
+    /// Configure SSH and environment without launching VS Code UI
+    #[arg(long)]
+    pub no_launch: bool,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IdeProfile {
+    Rust,
+    Python,
+    Cpp,
+    Web,
+    Full,
+}
+
+impl std::fmt::Display for IdeProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Rust => write!(f, "rust"),
+            Self::Python => write!(f, "python"),
+            Self::Cpp => write!(f, "cpp"),
+            Self::Web => write!(f, "web"),
+            Self::Full => write!(f, "full"),
+        }
+    }
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

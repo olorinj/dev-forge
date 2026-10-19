@@ -192,3 +192,4 @@ def _get_registered_vms():
         return out.splitlines()
     except Exception:
         return []
+

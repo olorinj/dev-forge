@@ -5,6 +5,9 @@ param(
     [string]$DistDir = "C:\workspace\dist",
     [string]$TargetDir = "C:\target",
     [string]$WorkspaceDir = "C:\workspace",
+    [string]$AppVersion = "",
+    [string]$WixVersion = "",
+    [string]$GitBranch = "",
     [switch]$FindIconOnly
 )
 
@@ -121,6 +124,44 @@ if ($detectedIcon) {
     Write-Host "[dev-forge : icon] Icono de aplicacion vinculado: $detectedIcon" -ForegroundColor Green
 }
 
+# --- Detección y normalización de versión y rama Git ---
+if (-not $AppVersion) {
+    if (Test-Path (Join-Path $WorkspaceDir "Cargo.toml")) {
+        $cargoContent = Get-Content (Join-Path $WorkspaceDir "Cargo.toml") -Raw -ErrorAction SilentlyContinue
+        if ($cargoContent -match '(?m)^version\s*=\s*"([^"]+)"') { $AppVersion = $matches[1] }
+    } elseif (Test-Path (Join-Path $WorkspaceDir "pyproject.toml")) {
+        $pyContent = Get-Content (Join-Path $WorkspaceDir "pyproject.toml") -Raw -ErrorAction SilentlyContinue
+        if ($pyContent -match '(?m)version\s*=\s*"([^"]+)"') { $AppVersion = $matches[1] }
+    } elseif (Test-Path (Join-Path $WorkspaceDir "package.json")) {
+        $pkgContent = Get-Content (Join-Path $WorkspaceDir "package.json") -Raw -ErrorAction SilentlyContinue
+        if ($pkgContent -match '"version"\s*:\s*"([^"]+)"') { $AppVersion = $matches[1] }
+    }
+}
+if (-not $AppVersion) { $AppVersion = "0.1.0" }
+
+if (-not $GitBranch -and (Test-Path (Join-Path $WorkspaceDir ".git"))) {
+    try {
+        $branch = (& git --git-dir=(Join-Path $WorkspaceDir ".git") rev-parse --abbrev-ref HEAD 2>$null).Trim()
+        if ($branch -and $branch -ne "HEAD") { $GitBranch = $branch }
+    } catch {}
+}
+
+$displayVersion = if ($GitBranch) { "$AppVersion-$GitBranch" } else { $AppVersion }
+
+if (-not $WixVersion) {
+    # WiX requires strict Major.Minor.Build format (e.g. 1.2.3)
+    if ($AppVersion -match '^(\d+)(\.(\d+))?(\.(\d+))?') {
+        $major = $matches[1]
+        $minor = if ($matches[3]) { $matches[3] } else { "0" }
+        $patch = if ($matches[5]) { $matches[5] } else { "0" }
+        $WixVersion = "$major.$minor.$patch"
+    } else {
+        $WixVersion = "1.0.0"
+    }
+}
+
+Write-Host "[dev-forge : version] Version detectada: $displayVersion (WiX: $WixVersion)" -ForegroundColor Green
+
 # Resolve Inno Setup Compiler
 $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
 if (-not $iscc) {
@@ -144,7 +185,7 @@ if (-not $light) {
 foreach ($exe in $exeFiles) {
     $baseName = $exe.BaseName
     $exeFullName = $exe.FullName
-    Write-Host "[dev-forge : packager] Empaquetando `"$baseName`"..." -ForegroundColor Cyan
+    Write-Host "[dev-forge : packager] Empaquetando `"$baseName`" ($displayVersion)..." -ForegroundColor Cyan
 
     # --- 1. Generar instalador Inno Setup (.exe) ---
     if ($iscc) {
@@ -162,7 +203,7 @@ foreach ($exe in $exeFiles) {
         $issContent = @"
 [Setup]
 AppName=$baseName
-AppVersion=1.0.0
+AppVersion=$displayVersion
 DefaultDirName={autopf}\$baseName
 DefaultGroupName=$baseName
 OutputDir=$DistDir
@@ -184,8 +225,11 @@ Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"$iconParam
         Set-Content -Path $issPath -Value $issContent -Encoding UTF8
         Write-Host "  -> Compilando Inno Setup: $baseName-setup.exe..." -ForegroundColor Yellow
         & $iscc /Q "$issPath"
-        if (Test-Path (Join-Path $DistDir "$baseName-setup.exe")) {
-            Write-Host "  [OK] Inno Setup: $baseName-setup.exe generado exitosamente." -ForegroundColor Green
+        $standardSetup = Join-Path $DistDir "$baseName-setup.exe"
+        if (Test-Path $standardSetup) {
+            # Duplicar con nombre versionado para releases
+            Copy-Item -Path $standardSetup -Destination (Join-Path $DistDir "$baseName-$displayVersion-setup.exe") -Force -ErrorAction SilentlyContinue
+            Write-Host "  [OK] Inno Setup: $baseName-setup.exe ($baseName-$displayVersion-setup.exe) generado exitosamente." -ForegroundColor Green
         } else {
             Write-Warning "  [FALLO] No se pudo generar $baseName-setup.exe"
         }
@@ -221,7 +265,7 @@ Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"$iconParam
         $wxsContent = @"
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="$baseName" Language="1033" Version="1.0.0" Manufacturer="dev-forge" UpgradeCode="$upgradeGuid">
+  <Product Id="*" Name="$baseName ($displayVersion)" Language="1033" Version="$WixVersion" Manufacturer="dev-forge" UpgradeCode="$upgradeGuid">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     <MediaTemplate EmbedCab="yes" />
     $wixIconTag
@@ -248,14 +292,16 @@ Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"$iconParam
 </Wix>
 "@
         Set-Content -Path $wxsPath -Value $wxsContent -Encoding UTF8
-        Write-Host "  -> Compilando WiX MSI: $baseName.msi..." -ForegroundColor Yellow
+        Write-Host "  -> Compilando WiX MSI: $baseName.msi (Version: $WixVersion)..." -ForegroundColor Yellow
         & $candle -nologo -out "$wixObj" "$wxsPath" 2>&1 | Out-Null
         & $light -nologo -sval -spdb -out "$msiPath" "$wixObj" 2>&1 | Out-Null
         if (Test-Path (Join-Path $DistDir "$baseName.wixpdb")) {
             Remove-Item -Path (Join-Path $DistDir "$baseName.wixpdb") -Force -ErrorAction SilentlyContinue
         }
         if (Test-Path $msiPath) {
-            Write-Host "  [OK] WiX MSI: $baseName.msi generado exitosamente." -ForegroundColor Green
+            # Duplicar con nombre versionado para releases
+            Copy-Item -Path $msiPath -Destination (Join-Path $DistDir "$baseName-$displayVersion.msi") -Force -ErrorAction SilentlyContinue
+            Write-Host "  [OK] WiX MSI: $baseName.msi ($baseName-$displayVersion.msi) generado exitosamente." -ForegroundColor Green
         } else {
             Write-Warning "  [FALLO] No se pudo generar $baseName.msi"
         }

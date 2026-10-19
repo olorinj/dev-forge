@@ -151,3 +151,132 @@ def detect_python_details(path: Path) -> PythonDetails:
         manager = PythonManager.PIP
 
     return PythonDetails(manager=manager, is_multipython=is_multipython, matrix_tool=matrix_tool)
+
+
+@dataclass
+class ProjectVersionInfo:
+    raw: str
+    display: str
+    wix: str
+    branch: str
+    commit: str
+
+
+def extract_project_version(path: Path) -> ProjectVersionInfo:
+    """Extract project version from manifests and Git branch/commit."""
+    raw_version: Optional[str] = None
+
+    # 1. Cargo.toml
+    cargo_path = path / "Cargo.toml"
+    if cargo_path.is_file():
+        try:
+            content = cargo_path.read_text(encoding="utf-8")
+            in_package = False
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    in_package = stripped == "[package]"
+                elif in_package and stripped.startswith("version"):
+                    parts = stripped.split('"')
+                    if len(parts) >= 3:
+                        raw_version = parts[1]
+                        break
+        except Exception:
+            pass
+
+    # 2. pyproject.toml
+    if not raw_version:
+        py_path = path / "pyproject.toml"
+        if py_path.is_file():
+            try:
+                content = py_path.read_text(encoding="utf-8")
+                for line in content.splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith("version"):
+                        parts = stripped.split('"')
+                        if len(parts) >= 3:
+                            raw_version = parts[1]
+                            break
+                        parts_sq = stripped.split("'")
+                        if len(parts_sq) >= 3:
+                            raw_version = parts_sq[1]
+                            break
+            except Exception:
+                pass
+
+    # 3. package.json
+    if not raw_version:
+        pkg_path = path / "package.json"
+        if pkg_path.is_file():
+            try:
+                import json
+                data = json.loads(pkg_path.read_text(encoding="utf-8"))
+                if "version" in data and isinstance(data["version"], str):
+                    raw_version = data["version"]
+            except Exception:
+                pass
+
+    raw = raw_version or "0.1.0"
+
+    # Git metadata
+    branch, commit = _extract_git_info(path)
+
+    display = f"{raw}-{branch}" if (branch and branch != "HEAD") else raw
+    wix = _sanitize_wix_version(raw)
+
+    return ProjectVersionInfo(
+        raw=raw,
+        display=display,
+        wix=wix,
+        branch=branch,
+        commit=commit,
+    )
+
+
+def _extract_git_info(path: Path) -> tuple[str, str]:
+    import subprocess
+    branch = ""
+    commit = ""
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0:
+            b = res.stdout.strip()
+            if b and b != "HEAD":
+                branch = b
+    except Exception:
+        pass
+
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0:
+            commit = res.stdout.strip()
+    except Exception:
+        pass
+
+    return branch, commit
+
+
+def _sanitize_wix_version(raw: str) -> str:
+    clean = raw.split("-")[0]
+    parts = clean.split(".")
+    nums = []
+    for p in parts:
+        digits = "".join(c for c in p if c.isdigit())
+        if digits:
+            nums.append(digits)
+        else:
+            break
+    while len(nums) < 3:
+        nums.append("0")
+    return f"{nums[0]}.{nums[1]}.{nums[2]}"
+

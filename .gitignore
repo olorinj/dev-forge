@@ -34,6 +34,7 @@ releases/
 # Caches de Lenguajes y Entornos
 __pycache__/
 *.py[cod]
+*.spec
 .venv/
 venv/
 .pytest_cache/

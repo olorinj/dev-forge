@@ -48,3 +48,4 @@ def clean_cache(subsystem: str | None = None) -> None:
             log_ok(f"Caché persistente global purgada con éxito ({size_mb:.2f} MB liberados)")
     except Exception as e:
         log_warn(f"Error al limpiar caché: {e}")
+

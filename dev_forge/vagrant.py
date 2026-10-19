@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 from dev_forge.banner import log_err, log_info, log_ok, log_warn
-from dev_forge.detector import ProjectType, ProjectTypeKind, PythonManager
+from dev_forge.detector import ProjectType, ProjectTypeKind, PythonManager, extract_project_version
 from dev_forge.hardware import detect_hardware
 
 
@@ -161,6 +161,8 @@ def cmd_build(
     clean: bool = False,
     keep_vm: bool = False,
     update: bool = False,
+    compiler: str = "nuitka",
+    pyinstaller: bool = False,
 ) -> None:
     """Compile a project inside the isolated VM environment."""
     from dev_forge.config import load_host_profile
@@ -176,22 +178,29 @@ def cmd_build(
     dist_dir.mkdir(parents=True, exist_ok=True)
 
     ptype = detect_project_type(project_canonical)
+    ver_info = extract_project_version(project_canonical)
 
     log_info(f"Proyecto a compilar: {project_canonical}")
     log_info(f"Tipo de proyecto detectado: {ptype}")
+    log_info(f"Versión detectada: {ver_info.display} (WiX: {ver_info.wix})")
     log_info(f"Destino solicitado: {target}")
 
     envs = {"FORGE_WORKSPACE": str(project_canonical)}
 
     if target in ("linux", "macos"):
-        build_on_linux(ptype, project_canonical, clean, keep_vm, update, envs)
+        build_on_linux(ptype, project_canonical, clean, keep_vm, update, envs, compiler=compiler, pyinstaller=pyinstaller, ver_info=ver_info)
     elif target == "windows":
-        build_on_windows(ptype, project_canonical, clean, keep_vm, update, envs)
+        build_on_windows(ptype, project_canonical, clean, keep_vm, update, envs, compiler=compiler, pyinstaller=pyinstaller, ver_info=ver_info)
     elif target == "all":
-        build_on_linux(ptype, project_canonical, clean, keep_vm, update, envs)
-        build_on_windows(ptype, project_canonical, clean, keep_vm, update, envs)
+        build_on_linux(ptype, project_canonical, clean, keep_vm, update, envs, compiler=compiler, pyinstaller=pyinstaller, ver_info=ver_info)
+        build_on_windows(ptype, project_canonical, clean, keep_vm, update, envs, compiler=compiler, pyinstaller=pyinstaller, ver_info=ver_info)
     else:
         log_err(f"Destino no soportado: {target}")
+        sys.exit(1)
+
+    dist_count = len(list(dist_dir.iterdir())) if dist_dir.exists() else 0
+    if dist_count == 0:
+        log_err(f"La compilación finalizó pero no se generó ningún artefacto en '{dist_dir}'")
         sys.exit(1)
 
     log_ok(f"Compilación finalizada. Binarios depositados en: {dist_dir}")
@@ -204,6 +213,9 @@ def build_on_linux(
     keep_vm: bool,
     update: bool,
     envs: Dict[str, str],
+    compiler: str = "nuitka",
+    pyinstaller: bool = False,
+    ver_info=None,
 ) -> None:
     """Execute isolated build pass on forge-linux."""
     ensure_mutual_exclusion("forge-linux")
@@ -258,8 +270,16 @@ def build_on_linux(
         else ""
     )
 
+    use_nuitka = not pyinstaller and compiler == "nuitka"
+    wix_ver = ver_info.wix if ver_info else "1.0.0"
+
     if ptype.kind == ProjectTypeKind.RUST_TAURI:
-        build_script = f"{clean_cmd}cd /workspace && cargo tauri build && cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || true"
+        build_script = (
+            f"{clean_cmd}cd /workspace && (cargo tauri build || npx @tauri-apps/cli build || npx tauri build) && "
+            f"(mkdir -p /workspace/dist && (cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || "
+            f"cp src-tauri/target/release/$(grep -m1 name src-tauri/Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null || "
+            f"cp target/release/$(grep -m1 name Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null))"
+        )
     elif ptype.kind == ProjectTypeKind.RUST:
         build_script = (
             f"{clean_cmd}cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release && "
@@ -267,7 +287,16 @@ def build_on_linux(
         )
     elif ptype.kind == ProjectTypeKind.PYTHON:
         if (project_path / "main.py").is_file():
-            build_script = f"{clean_cmd}cd /workspace && pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/"
+            if use_nuitka:
+                build_script = (
+                    f"{clean_cmd}cd /workspace && if command -v nuitka >/dev/null 2>&1; then "
+                    f"nuitka --standalone --onefile --output-dir=/tmp/nuitka-out --product-version={wix_ver} "
+                    f"--assume-yes-for-downloads main.py -o hashforge-py && mkdir -p /workspace/dist && "
+                    f"cp /tmp/nuitka-out/hashforge-py /workspace/dist/; else "
+                    f"pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/; fi"
+                )
+            else:
+                build_script = f"{clean_cmd}cd /workspace && pyinstaller --clean -F --name hashforge-py main.py --distpath /workspace/dist/"
         else:
             build_script = f"{clean_cmd}cd /workspace && python3 -m build -o /workspace/dist/ 2>/dev/null || python3 -m pip wheel . -w /workspace/dist/"
     elif ptype.kind == ProjectTypeKind.JAVA:
@@ -328,6 +357,9 @@ def build_on_windows(
     keep_vm: bool,
     update: bool,
     envs: Dict[str, str],
+    compiler: str = "nuitka",
+    pyinstaller: bool = False,
+    ver_info=None,
 ) -> None:
     """Execute isolated build pass on forge-windows."""
     ensure_mutual_exclusion("forge-windows")
@@ -380,6 +412,11 @@ def build_on_windows(
         "New-Item -ItemType Directory -Path C:\\forge-cache\\cargo, C:\\forge-cache\\go\\pkg\\mod, C:\\forge-cache\\pip, C:\\forge-cache\\gradle -Force | Out-Null }; "
     )
 
+    use_nuitka = not pyinstaller and compiler == "nuitka"
+    wix_ver = ver_info.wix if ver_info else "1.0.0"
+    raw_ver = ver_info.raw if ver_info else "0.1.0"
+    branch = ver_info.branch if ver_info else ""
+
     if ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
         build_ps = (
             f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
@@ -387,15 +424,25 @@ def build_on_windows(
             f"Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force"
         )
     elif ptype.kind == ProjectTypeKind.PYTHON:
-        build_ps = (
-            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; "
-            f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
-            f"if (Test-Path main.py) {{ "
-            f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
-            f"$icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; "
-            f"Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
-            f"if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
-        )
+        if use_nuitka:
+            py_cmd = (
+                f"if (Test-Path main.py) {{ "
+                f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
+                f"$icoOpt = if ($ico) {{ \"--windows-icon-from-ico='$ico'\" }} else {{ '' }}; "
+                f"Invoke-Expression \"nuitka --standalone --onefile --output-dir=C:\\target\\nuitka-out $icoOpt --product-version='{wix_ver}' --file-version='{wix_ver}' --assume-yes-for-downloads main.py -o hashforge-py.exe 2>&1\" | Out-Host; "
+                f"if (Test-Path C:\\target\\nuitka-out\\hashforge-py.exe) {{ Copy-Item C:\\target\\nuitka-out\\hashforge-py.exe C:\\workspace\\dist\\ -Force; exit 0 }} else {{ "
+                f"Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
+                f"if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} }} else {{ python -m build -o C:\\workspace\\dist }}"
+            )
+        else:
+            py_cmd = (
+                f"if (Test-Path main.py) {{ "
+                f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
+                f"$icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; "
+                f"Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
+                f"if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
+            )
+        build_ps = f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {py_cmd}"
     elif ptype.kind == ProjectTypeKind.CCPP:
         build_ps = (
             f"{link_ps}{clean_ps}{cache_init}{vs_shell_init}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; "
@@ -415,8 +462,9 @@ def build_on_windows(
         )
 
     pack_ps = (
-        "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') { "
-        "& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' }"
+        f"; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ "
+        f"& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' "
+        f"-AppVersion '{raw_ver}' -WixVersion '{wix_ver}' -GitBranch '{branch}' }}"
     )
     full_cmd = f"{build_ps}{pack_ps}"
 

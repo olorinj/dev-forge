@@ -6,6 +6,7 @@ mod cli;
 mod config;
 mod doctor;
 mod hardware;
+mod ide;
 mod keyboard;
 mod project;
 mod terminal;
@@ -117,6 +118,9 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         }
         Commands::CleanCache { subsystem } => {
             cache::clean_cache(subsystem.as_deref())?;
+        }
+        Commands::Ide(args) => {
+            ide::run_ide(&args)?;
         }
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();

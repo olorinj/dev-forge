@@ -72,6 +72,34 @@ class TestDevForge(unittest.TestCase):
             (p / "sub" / "b.bin").write_bytes(b"67890")
             self.assertEqual(get_dir_size(p), 10)
 
+    def test_version_extraction(self):
+        from dev_forge.detector import extract_project_version
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "Cargo.toml").write_text('[package]\nname = "demo"\nversion = "2.1.3-beta"', encoding="utf-8")
+            ver = extract_project_version(p)
+            self.assertEqual(ver.raw, "2.1.3-beta")
+            self.assertEqual(ver.wix, "2.1.3")
+
+    def test_parse_ssh_config(self):
+        from dev_forge.ide import parse_ssh_config
+        sample = "Host forge-linux\n  HostName 127.0.0.1\n  User vagrant\n  Port 2200\n  IdentityFile \"/path/to/key\"\n"
+        h, p, u, k = parse_ssh_config(sample)
+        self.assertEqual(h, "127.0.0.1")
+        self.assertEqual(p, "2200")
+        self.assertEqual(u, "vagrant")
+        self.assertEqual(k, "/path/to/key")
+
+    def test_inject_vscode_profile(self):
+        from dev_forge.ide import inject_vscode_profile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            inject_vscode_profile(p, "rust")
+            ext_file = p / ".vscode" / "extensions.json"
+            self.assertTrue(ext_file.is_file())
+            content = ext_file.read_text(encoding="utf-8")
+            self.assertIn("rust-lang.rust-analyzer", content)
+
 
 if __name__ == "__main__":
     unittest.main()
