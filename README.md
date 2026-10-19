@@ -135,6 +135,7 @@ Para consultar detalles de implementación, diagramas de arquitectura interna o 
 - 📐 **[Arquitectura del Sistema y Flujo de Datos](docs/architecture.md)**
 - 🍏 **[Compilación y Firmado de GUIs para macOS desde Linux](docs/macos-gui-compilation.md)**
 - 📖 **[Referencia de Lenguajes y Ecosistemas Soportados](docs/supported-languages.md)**
+- 📋 **[Registro de Cambios (Changelog)](CHANGELOG.md)**
 
 ---
 
