@@ -76,6 +76,16 @@ $env:Path += ";C:\DEV\dev-forge\bin"
 Set-Alias -Name dev-forge -Value "C:\DEV\dev-forge\bin\dev-forge.ps1"
 ```
 
+#### Ejecución Directa con Python 3:
+Alternativamente, `dev-forge` puede ejecutarse directamente mediante su motor en Python sin requerir compilación previa:
+```bash
+# Lanzador directo
+python3 dev-forge.py --help
+
+# O como módulo instalado
+python3 -m dev_forge tune
+```
+
 ---
 
 ## 💻 Uso Rápido del CLI

@@ -28,12 +28,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Headless server core virtualization profile (`gusztavvargadr/windows-server-2022-standard-core`).
   - Multi-level optimization suite (`optimize-level2-recommended.ps1`) configuring Windows Defender compilation exclusions, filesystem optimizations, and WinRM quotas.
   - Automated guest health-check validation (`provision/windows/health-check.ps1`, 9/9 checks passing).
+- **Pure Python Orchestrator Engine (`dev-forge.py` & `dev_forge/`)**:
+  - Modular Python package achieving 100% subcommand and behavioral parity with the native Rust CLI (`dev_forge/cli.py`, `config.py`, `hardware.py`, `detector.py`, `vagrant.py`, `banner.py`).
+  - Zero-dependency execution on host Python 3.10+ with cross-platform Win32/POSIX resource evaluation.
+  - Transparent fallback integrated into `bin/dev-forge` (Bash) and `bin/dev-forge.ps1` (PowerShell with UTF-8 BOM).
+  - Standalone entrypoint `dev-forge.py` and package runner `python -m dev_forge`.
+  - Comprehensive unit test suite in `tests/test_dev_forge.py`.
 - **Universal Multi-Language Verification Suite (`HashForge`)**:
   - Reference implementation in `examples/hashforge/` verifying toolchain health with deterministic SHA-256 and MD5 test vectors across Rust, Python, Go, Node, Java, and C/C++.
   - Dual-shell test harnesses (`test.sh` and `test.ps1`).
   - Documented full-matrix execution commands (`all all`, per-language, and per-target) in the main `README.md`.
 
 ### Changed
+- **Purge of Android Toolchain & Mobile Scope**:
+  - Purged Android Command-line Tools, SDK, and licenses from guest provisioning (`provision/linux/50-java.sh`) to optimize storage and host memory headroom.
+  - Removed Android target and test matrix from `examples/hashforge/` (7 active desktop/backend ecosystems verified 7/7).
 - **Windows MSVC Build Tools Provisioning**:
   - Upgraded [`provision/windows/10-msvc.ps1`](provision/windows/10-msvc.ps1) to install official Visual Studio 2022 C++ Build Tools (`visualstudio2022buildtools` with `Microsoft.VisualStudio.Workload.VCTools`), providing `cl.exe`, `link.exe`, and the Windows SDK.
   - Added `ninja v1.13.2` to baseline Windows provisioning in [`provision/windows/00-base.ps1`](provision/windows/00-base.ps1).
