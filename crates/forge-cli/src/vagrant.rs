@@ -509,7 +509,7 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
             link_ps, clean_ps
         ),
         ProjectType::Python(_) => format!(
-            "{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; if (Test-Path main.py) {{ python -m PyInstaller --clean -F --name hashforge-py main.py --distpath C:\\workspace\\dist 2>&1 | Out-Host; if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}",
+            "{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; if (Test-Path main.py) {{ $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}",
             link_ps, clean_ps
         ),
         ProjectType::CCpp => format!(
@@ -526,7 +526,7 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
         ),
     };
 
-    let pack_ps = "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') { & 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' }";
+    let pack_ps = "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') { & 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' }";
     let full_cmd = format!("{}{}", build_ps, pack_ps);
 
     log_info("Ejecutando proceso de compilacion remota en Windows Server Core...");

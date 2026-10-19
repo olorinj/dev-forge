@@ -1,13 +1,109 @@
 ﻿# =============================================================================
-# dev-forge : Universal Windows Packaging Engine (InnoSetup & WiX MSI)
+# dev-forge : Universal Windows Packaging Engine (InnoSetup & WiX MSI + Icons)
 # =============================================================================
 param(
     [string]$DistDir = "C:\workspace\dist",
-    [string]$TargetDir = "C:\target"
+    [string]$TargetDir = "C:\target",
+    [string]$WorkspaceDir = "C:\workspace",
+    [switch]$FindIconOnly
 )
 
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $OutputEncoding = [System.Text.Encoding]::UTF8
+
+function Find-ProjectIcon([string]$workspace, [string]$target) {
+    if (-not (Test-Path $workspace)) { return $null }
+
+    # 1. Search prioritized .ico files
+    $priorityIcoPaths = @(
+        "assets\icon.ico",
+        "assets\app.ico",
+        "icons\icon.ico",
+        "icons\app.ico",
+        "src-tauri\icons\icon.ico",
+        "resources\icon.ico",
+        "resources\app.ico",
+        "windows\icon.ico",
+        "icon.ico",
+        "app.ico"
+    )
+
+    foreach ($rel in $priorityIcoPaths) {
+        $candidate = Join-Path $workspace $rel
+        if (Test-Path $candidate) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    # 2. General search for any .ico in workspace (excluding build and version control dirs)
+    $anyIco = Get-ChildItem -Path $workspace -Filter "*.ico" -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch "(\\target\\|\\dist\\|\\\.git\\|\\node_modules\\|\\build\\)" } |
+        Select-Object -First 1
+
+    if ($anyIco) {
+        return $anyIco.FullName
+    }
+
+    # 3. Search prioritized .png files for conversion
+    $priorityPngPaths = @(
+        "assets\icon.png",
+        "assets\app.png",
+        "assets\logo.png",
+        "icons\icon.png",
+        "icons\app.png",
+        "src-tauri\icons\icon.png",
+        "src-tauri\icons\128x128.png",
+        "src-tauri\icons\32x32.png",
+        "resources\icon.png",
+        "icon.png",
+        "app.png",
+        "logo.png"
+    )
+
+    $foundPng = $null
+    foreach ($rel in $priorityPngPaths) {
+        $candidate = Join-Path $workspace $rel
+        if (Test-Path $candidate) {
+            $foundPng = (Resolve-Path $candidate).Path
+            break
+        }
+    }
+
+    if (-not $foundPng) {
+        $candidateItem = Get-ChildItem -Path $workspace -Filter "*.png" -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch "(\\target\\|\\dist\\|\\\.git\\|\\node_modules\\|\\build\\)" -and $_.Name -match "(?i)(icon|logo|app)" } |
+            Select-Object -First 1
+        if ($candidateItem) {
+            $foundPng = $candidateItem.FullName
+        }
+    }
+
+    if ($foundPng) {
+        $genIco = Join-Path $target "app_generated.ico"
+        $converter = "C:\forge\provision\windows\convert-icon.py"
+        if (Test-Path $converter) {
+            & python $converter "$foundPng" "$genIco" 2>&1 | Out-Null
+            if (Test-Path $genIco) {
+                return (Resolve-Path $genIco).Path
+            }
+        }
+    }
+
+    return $null
+}
+
+if (-not (Test-Path $TargetDir)) {
+    New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+}
+
+$detectedIcon = Find-ProjectIcon -workspace $WorkspaceDir -target $TargetDir
+
+if ($FindIconOnly) {
+    if ($detectedIcon) {
+        Write-Output $detectedIcon
+    }
+    exit 0
+}
 
 if (-not (Test-Path $DistDir)) {
     exit 0
@@ -19,6 +115,10 @@ $exeFiles = Get-ChildItem -Path $DistDir -Filter "*.exe" | Where-Object {
 
 if (-not $exeFiles -or $exeFiles.Count -eq 0) {
     exit 0
+}
+
+if ($detectedIcon) {
+    Write-Host "[dev-forge : icon] Icono de aplicacion vinculado: $detectedIcon" -ForegroundColor Green
 }
 
 # Resolve Inno Setup Compiler
@@ -41,10 +141,6 @@ if (-not $light) {
     if (Test-Path $fallbackLight) { $light = $fallbackLight }
 }
 
-if (-not (Test-Path $TargetDir)) {
-    New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-}
-
 foreach ($exe in $exeFiles) {
     $baseName = $exe.BaseName
     $exeFullName = $exe.FullName
@@ -53,6 +149,16 @@ foreach ($exe in $exeFiles) {
     # --- 1. Generar instalador Inno Setup (.exe) ---
     if ($iscc) {
         $issPath = Join-Path $TargetDir "$baseName.iss"
+
+        $setupIconLine = ""
+        $iconFileLine = ""
+        $iconParam = ""
+        if ($detectedIcon -and (Test-Path $detectedIcon)) {
+            $setupIconLine = "SetupIconFile=$detectedIcon"
+            $iconFileLine = "Source: `"$detectedIcon`"; DestDir: `"{app}`"; DestName: `"app.ico`"; Flags: ignoreversion"
+            $iconParam = "; IconFilename: `"{app}\app.ico`""
+        }
+
         $issContent = @"
 [Setup]
 AppName=$baseName
@@ -65,13 +171,15 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
+$setupIconLine
 
 [Files]
 Source: "$exeFullName"; DestDir: "{app}"; Flags: ignoreversion
+$iconFileLine
 
 [Icons]
-Name: "{group}\$baseName"; Filename: "{app}\$($exe.Name)"
-Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"
+Name: "{group}\$baseName"; Filename: "{app}\$($exe.Name)"$iconParam
+Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"$iconParam
 "@
         Set-Content -Path $issPath -Value $issContent -Encoding UTF8
         Write-Host "  -> Compilando Inno Setup: $baseName-setup.exe..." -ForegroundColor Yellow
@@ -93,23 +201,48 @@ Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"
         
         $upgradeGuid = [guid]::NewGuid().ToString()
 
+        $wixIconTag = ""
+        $wixIconProp = ""
+        $wixIconComponent = ""
+        $wixIconFeatureRef = ""
+        $wixShortcutIcon = ""
+        if ($detectedIcon -and (Test-Path $detectedIcon)) {
+            $wixIconTag = "<Icon Id=`"AppIcon`" SourceFile=`"$detectedIcon`" />"
+            $wixIconProp = "<Property Id=`"ARPPRODUCTICON`" Value=`"AppIcon`" />"
+            $wixIconComponent = @"
+          <Component Id="AppIconComponent" Guid="*" Win64="yes">
+            <File Id="AppIconFile" Source="$detectedIcon" Name="app.ico" KeyPath="yes" />
+          </Component>
+"@
+            $wixIconFeatureRef = "<ComponentRef Id=`"AppIconComponent`" />"
+            $wixShortcutIcon = "Icon=`"AppIcon`""
+        }
+
         $wxsContent = @"
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*" Name="$baseName" Language="1033" Version="1.0.0" Manufacturer="dev-forge" UpgradeCode="$upgradeGuid">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     <MediaTemplate EmbedCab="yes" />
+    $wixIconTag
+    $wixIconProp
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLFOLDER" Name="$baseName">
           <Component Id="MainExecutable" Guid="*" Win64="yes">
             <File Id="MainExeFile" Source="$exeFullName" KeyPath="yes" />
+            <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="$baseName" WorkingDirectory="INSTALLFOLDER" $wixShortcutIcon Advertise="yes" />
+            <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="$baseName" WorkingDirectory="INSTALLFOLDER" $wixShortcutIcon Advertise="yes" />
           </Component>
+          $wixIconComponent
         </Directory>
       </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+      <Directory Id="ProgramMenuFolder" Name="Programs" />
     </Directory>
     <Feature Id="MainApplication" Title="$baseName" Level="1">
       <ComponentRef Id="MainExecutable" />
+      $wixIconFeatureRef
     </Feature>
   </Product>
 </Wix>

@@ -382,7 +382,10 @@ def build_on_windows(
         build_ps = (
             f"{link_ps}{clean_ps}Set-Location C:\\workspace; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
-            f"if (Test-Path main.py) {{ python -m PyInstaller --clean -F --name hashforge-py main.py --distpath C:\\workspace\\dist 2>&1 | Out-Host; "
+            f"if (Test-Path main.py) {{ "
+            f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
+            f"$icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; "
+            f"Invoke-Expression \"python -m PyInstaller --clean -F --name hashforge-py $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
             f"if (Test-Path C:\\workspace\\dist\\hashforge-py.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
         )
     elif ptype.kind == ProjectTypeKind.CCPP:
@@ -405,7 +408,7 @@ def build_on_windows(
 
     pack_ps = (
         "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') { "
-        "& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' }"
+        "& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' }"
     )
     full_cmd = f"{build_ps}{pack_ps}"
 
