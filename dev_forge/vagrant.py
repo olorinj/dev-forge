@@ -248,6 +248,8 @@ def build_on_linux(
     mount_prefix = (
         "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace && "
         "source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.local/bin:$PATH\"; "
+        "if [ -d /forge-cache ]; then export CARGO_HOME=/forge-cache/cargo GOMODCACHE=/forge-cache/go/pkg/mod PIP_CACHE_DIR=/forge-cache/pip GRADLE_USER_HOME=/forge-cache/gradle; "
+        "mkdir -p /forge-cache/cargo /forge-cache/go/pkg/mod /forge-cache/pip /forge-cache/gradle; fi; "
     )
 
     clean_cmd = (
@@ -372,15 +374,21 @@ def build_on_windows(
         "& 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 | Out-Null }; "
     )
 
+    cache_init = (
+        "if (Test-Path C:\\forge-cache) { "
+        "$env:CARGO_HOME='C:\\forge-cache\\cargo'; $env:GOMODCACHE='C:\\forge-cache\\go\\pkg\\mod'; $env:PIP_CACHE_DIR='C:\\forge-cache\\pip'; $env:GRADLE_USER_HOME='C:\\forge-cache\\gradle'; "
+        "New-Item -ItemType Directory -Path C:\\forge-cache\\cargo, C:\\forge-cache\\go\\pkg\\mod, C:\\forge-cache\\pip, C:\\forge-cache\\gradle -Force | Out-Null }; "
+    )
+
     if ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
         build_ps = (
-            f"{link_ps}{clean_ps}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
+            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force"
         )
     elif ptype.kind == ProjectTypeKind.PYTHON:
         build_ps = (
-            f"{link_ps}{clean_ps}Set-Location C:\\workspace; "
+            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"if (Test-Path main.py) {{ "
             f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
@@ -390,20 +398,20 @@ def build_on_windows(
         )
     elif ptype.kind == ProjectTypeKind.CCPP:
         build_ps = (
-            f"{link_ps}{clean_ps}{vs_shell_init}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; "
+            f"{link_ps}{clean_ps}{cache_init}{vs_shell_init}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Copy-Item -Destination C:\\workspace\\dist\\ -Force"
         )
     elif ptype.kind == ProjectTypeKind.GO:
         build_ps = (
-            f"{link_ps}{clean_ps}Set-Location C:\\workspace; "
+            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"go build -o C:\\workspace\\dist\\hashforge-go.exe . ; "
             f"if (-not (Test-Path C:\\workspace\\dist\\hashforge-go.exe)) {{ go build -o C:\\workspace\\dist\\ . }}"
         )
     else:
         build_ps = (
-            f"{link_ps}{clean_ps}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}"
+            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}"
         )
 
     pack_ps = (

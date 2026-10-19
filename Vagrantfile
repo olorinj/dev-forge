@@ -5,10 +5,16 @@
 # dev-forge : Vagrantfile Orquestador Multi-Lenguaje y Multiplataforma
 # =============================================================================
 
+require 'fileutils'
+
 Vagrant.configure("2") do |config|
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
   end
+
+  # Directorio de caché persistente en el host para compiladores (Cargo, Go, Pip, Gradle)
+  host_cache_dir = File.expand_path("~/.dev-forge/cache")
+  FileUtils.mkdir_p(host_cache_dir) unless File.directory?(host_cache_dir)
 
   # Carga del perfil de dimensionamiento del host (generado por dev-forge tune)
   user_profile = File.expand_path("~/.dev-forge/forge-host.env")
@@ -90,10 +96,12 @@ Vagrant.configure("2") do |config|
   config.vm.define "forge-linux" do |linux|
     linux.vm.box = "bento/debian-12"
     linux.vm.hostname = "forge-linux"
-    # Carpeta del proyecto dev-forge
+    # Carpeta del proyecto dev-forge y caché de compiladores
     linux.vm.synced_folder ".", "/forge", mount_options: ["dmode=775", "fmode=775"]
+    linux.vm.synced_folder host_cache_dir, "/forge-cache", mount_options: ["dmode=775", "fmode=775", "uid=1000", "gid=1000"]
 
     linux.vm.provider "virtualbox" do |vb|
+      vb.linked_clone = true
       vb.name = "FORGE-LINUX"
       vb.memory = ENV.fetch("FORGE_LINUX_MEM", "5120")
       vb.cpus = ENV.fetch("FORGE_LINUX_CPUS", "2")
@@ -131,10 +139,12 @@ Vagrant.configure("2") do |config|
     win.vm.communicator = "winrm"
     win.winrm.retry_limit = 60
     win.winrm.retry_delay = 10
-    # Carpeta del proyecto dev-forge
+    # Carpeta del proyecto dev-forge y caché de compiladores
     win.vm.synced_folder ".", "c:/forge"
+    win.vm.synced_folder host_cache_dir, "c:/forge-cache"
 
     win.vm.provider "virtualbox" do |vb|
+      vb.linked_clone = true
       vb.name = "FORGE-WINDOWS"
       vb.memory = ENV.fetch("FORGE_WIN_MEM", "5120")
       vb.cpus = ENV.fetch("FORGE_WIN_CPUS", "2")

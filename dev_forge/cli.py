@@ -113,7 +113,14 @@ def create_parser() -> argparse.ArgumentParser:
         help="Specific VM to verify (default: forge-linux)",
     )
 
-    # 9. completions
+    # 9. doctor
+    subparsers.add_parser("doctor", help="Diagnose host virtualization, hypervisors and environment health")
+
+    # 10. clean-cache
+    cache_parser = subparsers.add_parser("clean-cache", help="Clean persistent host compiler cache (~/.dev-forge/cache)")
+    cache_parser.add_argument("-s", "--subsystem", help="Specific subsystem to clean (cargo | go | pip | gradle | sccache)")
+
+    # 11. completions
     comp_parser = subparsers.add_parser("completions", help="Generate shell completions")
     comp_parser.add_argument("shell", choices=["bash", "zsh", "powershell", "fish"])
 
@@ -142,5 +149,11 @@ def main(argv=None) -> None:
         cmd_build(args.project, args.target, args.clean, args.keep_vm, args.update)
     elif args.subcommand == "test-vm":
         cmd_test_vm(args.machine)
+    elif args.subcommand == "doctor":
+        from dev_forge.doctor import run_doctor
+        run_doctor()
+    elif args.subcommand == "clean-cache":
+        from dev_forge.cache import clean_cache
+        clean_cache(args.subsystem)
     elif args.subcommand == "completions":
         print(f"# Completions for {args.shell} are automatically supported via dev-forge")

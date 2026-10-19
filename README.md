@@ -152,6 +152,24 @@ dev-forge test-vm forge-windows # Verifica toolchains (MSVC, Rust, Python, Go, N
 .\bin\dev-forge.ps1 test-vm forge-windows
 ```
 
+### 4. Diagnóstico Pre-Vuelo (`doctor`) y Mantenimiento de Caché
+
+Audita automáticamente la virtualización por hardware (VT-x/AMD-V), memoria RAM, espacio en disco, estado de VirtualBox/Vagrant, puertos y controladores del host:
+
+#### En Linux / macOS:
+```bash
+dev-forge doctor                     # Auditoría integral pre-vuelo del host y las VMs
+dev-forge clean-cache                # Limpiar toda la caché persistente (~/.dev-forge/cache)
+dev-forge clean-cache -s cargo       # Limpiar solo la caché de un subsistema (cargo, go, pip, gradle, sccache)
+```
+
+#### En Windows:
+```powershell
+.\bin\dev-forge.ps1 doctor
+.\bin\dev-forge.ps1 clean-cache
+.\bin\dev-forge.ps1 clean-cache -s cargo
+```
+
 ---
 
 ## 🧪 Banco de Pruebas Multi-Lenguaje (`HashForge`)

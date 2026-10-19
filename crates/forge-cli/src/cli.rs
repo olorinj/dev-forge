@@ -70,6 +70,16 @@ pub enum Commands {
         machine: String,
     },
 
+    /// Diagnose host virtualization, hypervisors, ports and environment health
+    Doctor,
+
+    /// Clean persistent host compiler cache (~/.dev-forge/cache)
+    CleanCache {
+        /// Specific subsystem cache to clean (cargo | go | pip | gradle | sccache)
+        #[arg(short, long)]
+        subsystem: Option<String>,
+    },
+
     /// Generate native shell completion scripts
     Completions {
         /// Shell type

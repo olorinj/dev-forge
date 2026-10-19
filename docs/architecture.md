@@ -108,6 +108,20 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
   - **WiX Toolset (`<app>.msi`)**: Genera el archivo `.wxs` con GUIDs deterministas, compila con `candle.exe` y enlaza con `light.exe -sval -spdb`, registrando la propiedad `ARPPRODUCTICON` para el panel de desinstalación de Windows y accesos directos.
   - **Compiladores (PyInstaller)**: Inyecta dinámicamente `--icon <ruta_ico>` en la generación del binario principal.
 
+### 4.5 Clones Enlazados (`linked_clone = true`) para Ahorro de Disco e Instanciación en Segundos
+- Ambas máquinas virtuales (`forge-linux` y `forge-windows`) tienen habilitada la directiva `vb.linked_clone = true` en el `Vagrantfile`.
+- En lugar de clonar un disco virtual completo de 25-30 GB para cada VM, VirtualBox crea discos diferenciales copy-on-write basados en la imagen maestra (`base box`).
+- **Beneficios**:
+  - Tiempo de creación o recreación de la máquina virtual reducido de 5-10 minutos a $<10$ segundos.
+  - Ocupación en disco reducida de ~25 GB a ~2-3 GB por máquina virtual.
+
+### 4.6 Caché Persistente de Compiladores en el Host (`~/.dev-forge/cache`)
+- Para evitar descargas repetitivas de paquetes y módulos de terceros entre compilaciones de diferentes proyectos o reinicios de máquinas virtuales, `dev-forge` monta `~/.dev-forge/cache` como volumen compartido:
+  - **Linux**: Montado en `/forge-cache` (`CARGO_HOME=/forge-cache/cargo`, `GOMODCACHE=/forge-cache/go/pkg/mod`, `PIP_CACHE_DIR=/forge-cache/pip`, `GRADLE_USER_HOME=/forge-cache/gradle`).
+  - **Windows**: Montado en `C:\forge-cache`.
+- Los artefactos intermedios activos permanecen aislados en discos rápidos locales (`/tmp/cargo-target`, `C:\target`) para evitar bloqueos de red `vboxsf`, mientras que las descargas de paquetes se benefician de la persistencia en el host.
+- El usuario puede purgar la caché en cualquier momento mediante `dev-forge clean-cache [--subsystem <nombre>]`.
+
 ---
 
 ## 5. Ergonomía del Entorno y Estabilidad Operativa

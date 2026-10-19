@@ -63,6 +63,15 @@ class TestDevForge(unittest.TestCase):
             pt = detect_project_type(p)
             self.assertEqual(pt.kind, ProjectTypeKind.NODE)
 
+    def test_cache_size_calculation(self):
+        from dev_forge.cache import get_dir_size
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "a.bin").write_bytes(b"12345")
+            (p / "sub").mkdir()
+            (p / "sub" / "b.bin").write_bytes(b"67890")
+            self.assertEqual(get_dir_size(p), 10)
+
 
 if __name__ == "__main__":
     unittest.main()

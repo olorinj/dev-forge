@@ -1,8 +1,10 @@
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 
+mod cache;
 mod cli;
 mod config;
+mod doctor;
 mod hardware;
 mod keyboard;
 mod project;
@@ -109,6 +111,12 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         }
         Commands::TestVm { machine } => {
             vagrant::cmd_test_vm(&machine)?;
+        }
+        Commands::Doctor => {
+            doctor::run_doctor()?;
+        }
+        Commands::CleanCache { subsystem } => {
+            cache::clean_cache(subsystem.as_deref())?;
         }
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();

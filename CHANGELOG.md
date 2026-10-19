@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-10-19
 
 ### Added
+- **Multi-Platform Diagnostic Doctor (`dev-forge doctor`)**:
+  - Implemented comprehensive pre-flight diagnostic suite across Linux, Windows, and macOS inspecting CPU hardware virtualization (Intel VT-x / AMD-V), host RAM, free disk space on VM target volumes, VirtualBox CLI, Vagrant, forwarded ports (2222, 55985), and OS kernel modules (`vboxdrv`, `/dev/kvm`).
+  - Available across both native Rust CLI (`crates/forge-cli/src/doctor.rs`) and pure Python engine (`dev_forge/doctor.py`).
+- **Persistent Host Compiler Cache & Cache Pruning (`dev-forge clean-cache`)**:
+  - Synced host directory `~/.dev-forge/cache` into guests (`/forge-cache` on Linux, `C:\forge-cache` on Windows) providing shared caching for Cargo (`registry`), Go (`pkg/mod`), Pip (`cache`), and Gradle.
+  - Implemented `dev-forge clean-cache` (with optional `--subsystem` selector) to measure and prune cached artifacts on demand.
+- **Instant Boot & Storage Efficiency with Linked Clones**:
+  - Enabled `vb.linked_clone = true` in `Vagrantfile` for both `forge-linux` and `forge-windows`, reducing initial instance creation time from minutes to seconds and dropping host disk footprint from ~25 GB to ~2-3 GB per VM.
 - **Automated Windows Packaging Engine (Inno Setup & WiX MSI)**:
   - Automatically compiles standalone `.exe` binaries into Inno Setup installers (`<app>-setup.exe` with solid `lzma2` compression) and corporate Windows Installer packages (`<app>.msi` via WiX Toolset v3.14 `candle.exe` and `light.exe`) deposited directly into `dist/`.
   - Implemented in `provision/windows/package-artifacts.ps1` and triggered seamlessly across both Rust CLI (`crates/forge-cli/src/vagrant.rs`) and Python engine (`dev_forge/vagrant.py`).
