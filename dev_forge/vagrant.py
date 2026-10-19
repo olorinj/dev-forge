@@ -258,8 +258,9 @@ def build_on_linux(
     )
 
     mount_prefix = (
-        "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace && "
-        "source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.local/bin:$PATH\"; "
+        "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace 2>/dev/null || true; "
+        "sudo systemctl daemon-reload 2>/dev/null || true; "
+        "source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.cargo/bin:/root/.cargo/bin:/usr/local/bin:/home/vagrant/.local/bin:$PATH\"; "
         "if [ -d /forge-cache ]; then export CARGO_HOME=/forge-cache/cargo GOMODCACHE=/forge-cache/go/pkg/mod PIP_CACHE_DIR=/forge-cache/pip GRADLE_USER_HOME=/forge-cache/gradle; "
         "mkdir -p /forge-cache/cargo /forge-cache/go/pkg/mod /forge-cache/pip /forge-cache/gradle; fi; "
     )
@@ -275,7 +276,15 @@ def build_on_linux(
 
     if ptype.kind == ProjectTypeKind.RUST_TAURI:
         build_script = (
-            f"{clean_cmd}cd /workspace && (cargo tauri build || npx @tauri-apps/cli build || npx tauri build) && "
+            f"{clean_cmd}"
+            f"if ! command -v cargo-tauri >/dev/null 2>&1; then "
+            f"  if command -v cargo-binstall >/dev/null 2>&1; then "
+            f"    cargo-binstall -y --no-confirm tauri-cli 2>/dev/null || true; "
+            f"  elif command -v npm >/dev/null 2>&1; then "
+            f"    sudo npm install -g @tauri-apps/cli 2>/dev/null || true; "
+            f"  fi; "
+            f"fi; "
+            f"cd /workspace && (cargo tauri build || npx --yes @tauri-apps/cli build || npx --yes tauri build) && "
             f"(mkdir -p /workspace/dist && (cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || "
             f"cp src-tauri/target/release/$(grep -m1 name src-tauri/Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null || "
             f"cp target/release/$(grep -m1 name Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null))"
@@ -417,7 +426,17 @@ def build_on_windows(
     raw_ver = ver_info.raw if ver_info else "0.1.0"
     branch = ver_info.branch if ver_info else ""
 
-    if ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
+    if ptype.kind == ProjectTypeKind.RUST_TAURI:
+        build_ps = (
+            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; "
+            f"if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ cargo tauri build }} "
+            f"elseif (Get-Command npx.cmd -ErrorAction SilentlyContinue) {{ npx --yes @tauri-apps/cli build }} "
+            f"else {{ cargo build --release }}; "
+            f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
+            f"Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue; "
+            f"if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}"
+        )
+    elif ptype.kind == ProjectTypeKind.RUST:
         build_ps = (
             f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "

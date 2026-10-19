@@ -385,7 +385,7 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
         ])
         .output();
 
-    let mount_prefix = "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace && source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.local/bin:$PATH\"; if [ -d /forge-cache ]; then export CARGO_HOME=/forge-cache/cargo GOMODCACHE=/forge-cache/go/pkg/mod PIP_CACHE_DIR=/forge-cache/pip GRADLE_USER_HOME=/forge-cache/gradle; mkdir -p /forge-cache/cargo /forge-cache/go/pkg/mod /forge-cache/pip /forge-cache/gradle; fi; ";
+    let mount_prefix = "sudo mkdir -p /workspace && sudo mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 workspace /workspace 2>/dev/null || true; sudo systemctl daemon-reload 2>/dev/null || true; source /etc/profile 2>/dev/null || true; export PATH=\"/home/vagrant/.cargo/bin:/root/.cargo/bin:/usr/local/bin:/home/vagrant/.local/bin:$PATH\"; if [ -d /forge-cache ]; then export CARGO_HOME=/forge-cache/cargo GOMODCACHE=/forge-cache/go/pkg/mod PIP_CACHE_DIR=/forge-cache/pip GRADLE_USER_HOME=/forge-cache/gradle; mkdir -p /forge-cache/cargo /forge-cache/go/pkg/mod /forge-cache/pip /forge-cache/gradle; fi; ";
 
     let clean_cmd = if args.clean {
         "rm -rf /tmp/cargo-target/* /tmp/go-cache/* /tmp/build/* 2>/dev/null || true; "
@@ -398,7 +398,14 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
 
     let build_script = match ptype {
         ProjectType::RustTauri => format!(
-            "{}cd /workspace && (cargo tauri build || npx @tauri-apps/cli build || npx tauri build) && (mkdir -p /workspace/dist && (cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || cp src-tauri/target/release/$(grep -m1 name src-tauri/Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null || cp target/release/$(grep -m1 name Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null))",
+            "{}if ! command -v cargo-tauri >/dev/null 2>&1; then \
+                if command -v cargo-binstall >/dev/null 2>&1; then \
+                    cargo-binstall -y --no-confirm tauri-cli 2>/dev/null || true; \
+                elif command -v npm >/dev/null 2>&1; then \
+                    sudo npm install -g @tauri-apps/cli 2>/dev/null || true; \
+                fi; \
+            fi; \
+            cd /workspace && (cargo tauri build || npx --yes @tauri-apps/cli build || npx --yes tauri build) && (mkdir -p /workspace/dist && (cp -r src-tauri/target/release/bundle/* /workspace/dist/ 2>/dev/null || cp src-tauri/target/release/$(grep -m1 name src-tauri/Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null || cp target/release/$(grep -m1 name Cargo.toml | cut -d'\"' -f2) /workspace/dist/ 2>/dev/null))",
             clean_cmd
         ),
         ProjectType::Rust => format!(
@@ -539,7 +546,11 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
     let use_nuitka = !args.pyinstaller && args.compiler == PythonCompiler::Nuitka;
 
     let build_ps = match ptype {
-        ProjectType::Rust | ProjectType::RustTauri => format!(
+        ProjectType::RustTauri => format!(
+            "{}{}{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ cargo tauri build }} elseif (Get-Command npx.cmd -ErrorAction SilentlyContinue) {{ npx --yes @tauri-apps/cli build }} else {{ cargo build --release }}; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue; if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}",
+            link_ps, clean_ps, cache_init
+        ),
+        ProjectType::Rust => format!(
             "{}{}{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force",
             link_ps, clean_ps, cache_init
         ),

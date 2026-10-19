@@ -200,3 +200,4 @@ def inject_vscode_profile(workspace: Path, profile: str) -> None:
         set_file.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
 
     log_ok(f"Perfil '{profile}' configurado en {vscode_dir}")
+

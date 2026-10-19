@@ -8,5 +8,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     $env:PATH = "$env:ProgramFiles\nodejs;$env:PATH"
 }
 
+npm install -g @tauri-apps/cli 2>$null | Out-Null
+
 Write-Host "=== [dev-forge : Windows] 50-node: Node $(node -v) y npm $(npm -v) configurados ===" -ForegroundColor Green
 
