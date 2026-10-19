@@ -32,6 +32,13 @@ if (Get-Command cargo -ErrorAction SilentlyContinue) {
     }
 }
 
-Write-Host "[dev-forge : ERROR] No se encontro el binario compilado 'dev-forge.exe'." -ForegroundColor Red
-Write-Host "Instala Rust (cargo) o ejecuta: cargo build --release --bin dev-forge" -ForegroundColor Yellow
+# 4. Si python esta disponible, delegar transparentemente al motor Python
+$PyLauncher = Join-Path $ForgeDir "dev-forge.py"
+if ((Get-Command python -ErrorAction SilentlyContinue) -and (Test-Path $PyLauncher)) {
+    & python $PyLauncher @args
+    exit $LASTEXITCODE
+}
+
+Write-Host "[dev-forge : ERROR] No se encontro el binario compilado 'dev-forge.exe' ni Python 3." -ForegroundColor Red
+Write-Host "Instala Rust (cargo) o ejecuta con: python dev-forge.py" -ForegroundColor Yellow
 exit 1

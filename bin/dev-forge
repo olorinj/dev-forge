@@ -26,7 +26,12 @@ if command -v cargo >/dev/null 2>&1; then
     fi
 fi
 
-# Si no hay binario ni cargo, mostrar instrucciones claras
-echo -e "\e[31m[dev-forge : ERROR]\e[0m No se encontró el binario compilado 'dev-forge'." >&2
-echo -e "Instala Rust (cargo) o ejecuta: \e[1mcargo build --release --bin dev-forge\e[0m" >&2
+# 4. Si python3 está disponible, delegar transparentemente al motor Python
+if command -v python3 >/dev/null 2>&1 && [ -f "$FORGE_DIR/dev-forge.py" ]; then
+    exec python3 "$FORGE_DIR/dev-forge.py" "$@"
+fi
+
+# Si no hay binario ni cargo ni python3, mostrar instrucciones claras
+echo -e "\e[31m[dev-forge : ERROR]\e[0m No se encontró el binario compilado 'dev-forge' ni Python 3." >&2
+echo -e "Instala Rust (cargo) o ejecuta con: \e[1mpython3 dev-forge.py\e[0m" >&2
 exit 1
