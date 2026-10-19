@@ -6,7 +6,7 @@ authors = ["dev-forge team"]
 description = "Universal multi-platform CLI & GUI cryptographic hashing utility for dev-forge"
 
 [features]
-default = ["gui"]
+default = []
 gui = ["dep:eframe"]
 
 [dependencies]

@@ -49,8 +49,45 @@ pub fn cmd_status() -> Result<()> {
     Ok(())
 }
 
+pub fn ensure_mutual_exclusion(target_machine: &str) -> Result<()> {
+    let profile = crate::config::load_host_profile()?;
+    // Only enforce strict mutual exclusion on hosts with <= 16 GB RAM
+    if profile.total_ram_gb > 16 {
+        return Ok(());
+    }
+
+    let sibling = match target_machine {
+        "forge-linux" => "forge-windows",
+        "forge-windows" => "forge-linux",
+        _ => return Ok(()),
+    };
+
+    let sibling_vbox_name = if sibling == "forge-linux" {
+        "FORGE-LINUX"
+    } else {
+        "FORGE-WINDOWS"
+    };
+
+    if let Ok(out) = Command::new("VBoxManage")
+        .args(["list", "runningvms"])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if stdout.contains(sibling_vbox_name) || stdout.contains(sibling) {
+            log_warn(&format!(
+                "Host con memoria limitada ({} GB): apagando limpiamente '{}' para evitar colision de memoria...",
+                profile.total_ram_gb, sibling
+            ));
+            let _ = run_vagrant_streaming(&["halt", sibling], &[]);
+        }
+    }
+
+    Ok(())
+}
+
 pub fn cmd_up(machine: &str, provision: bool) -> Result<()> {
     crate::config::load_host_profile()?;
+    ensure_mutual_exclusion(machine)?;
     let mut args = vec!["up", machine];
     if provision {
         args.push("--provision");
@@ -110,6 +147,7 @@ pub fn cmd_ssh(machine: &str, command: Option<&str>) -> Result<()> {
 
 pub fn cmd_test_vm(machine: &str) -> Result<()> {
     crate::config::load_host_profile()?;
+    ensure_mutual_exclusion(machine)?;
     log_info(&format!(
         "Iniciando verificacion de salud y pruebas en '{}'...",
         machine
@@ -148,7 +186,7 @@ pub fn cmd_test_vm(machine: &str) -> Result<()> {
             );
             let status = Command::new("bash")
                 .args(["examples/hashforge/test.sh", "rust", "linux"])
-                .current_dir(&get_forge_dir())
+                .current_dir(get_forge_dir())
                 .status();
             if let Ok(st) = status {
                 if !st.success() {
@@ -158,6 +196,68 @@ pub fn cmd_test_vm(machine: &str) -> Result<()> {
         }
 
         log_ok("Todas las verificaciones de 'forge-linux' han finalizado con exito.");
+    } else if machine == "forge-windows" {
+        // 1. Ensure VM is up
+        let _ = run_vagrant_streaming(&["up", "forge-windows"], &[]);
+
+        // 2. Run provision/windows/health-check.ps1
+        println!(
+            "\n{}",
+            "--- [1/2] Verificando Sistema y Toolchains de Windows Server Core ---".bold()
+        );
+        let success = run_vagrant_streaming(
+            &[
+                "winrm",
+                "forge-windows",
+                "-s",
+                "powershell",
+                "-c",
+                "powershell.exe -ExecutionPolicy Bypass -NoProfile -File C:\\forge\\provision\\windows\\health-check.ps1",
+            ],
+            &[],
+        )?;
+
+        if !success {
+            log_err("La verificacion de toolchains en Windows ha detectado inconsistencias.");
+            anyhow::bail!("Fallo health-check de Windows");
+        }
+
+        // 3. Test HashForge multi-language verification on Windows
+        let hashforge_sh = Path::new("examples/hashforge/test.sh");
+        if hashforge_sh.is_file() {
+            println!(
+                "\n{}",
+                "--- [2/2] Ejecutando Suite Multi-Lenguaje HashForge (Rust -> Windows) ---".bold()
+            );
+            let status = Command::new("bash")
+                .args(["examples/hashforge/test.sh", "rust", "windows"])
+                .current_dir(get_forge_dir())
+                .status();
+            if let Ok(st) = status {
+                if !st.success() {
+                    log_warn("HashForge Rust Windows finalizo con advertencias.");
+                } else {
+                    println!(
+                        "\n{}",
+                        "--- Verificacion In-Guest (C:\\workspace\\dist\\hashforge.exe) ---".bold()
+                    );
+                    let run_guest = "if (Test-Path C:\\workspace\\dist\\hashforge.exe) { & C:\\workspace\\dist\\hashforge.exe -s 'dev-forge test' -j } else { Write-Host 'No se encontro hashforge.exe' -ForegroundColor Red }";
+                    let _ = run_vagrant_streaming(
+                        &[
+                            "winrm",
+                            "forge-windows",
+                            "-s",
+                            "powershell",
+                            "-c",
+                            run_guest,
+                        ],
+                        &[],
+                    );
+                }
+            }
+        }
+
+        log_ok("Todas las verificaciones de 'forge-windows' han finalizado con exito.");
     } else {
         log_info(&format!("Consultando estado de '{}'...", machine));
         run_vagrant_streaming(&["status", machine], &[])?;
@@ -219,6 +319,7 @@ pub fn cmd_build(args: &BuildArgs) -> Result<()> {
 }
 
 fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) -> Result<()> {
+    ensure_mutual_exclusion("forge-linux")?;
     log_info("Preparando entorno de compilacion en 'forge-linux'...");
     let mut up_args = vec!["up", "forge-linux"];
     if args.update {
@@ -227,13 +328,30 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
     run_vagrant_streaming(&up_args, envs)?;
 
     // Attach transient shared folder for dynamic workspace mounting
-    let project_canonical = args.project.canonicalize()
+    let project_canonical = args
+        .project
+        .canonicalize()
         .unwrap_or_else(|_| args.project.clone());
     // Unmount any previous workspace inside guest before changing host shared folder
-    let _ = run_vagrant_streaming(&["ssh", "forge-linux", "-c", "sudo umount -l /workspace 2>/dev/null || true"], envs);
+    let _ = run_vagrant_streaming(
+        &[
+            "ssh",
+            "forge-linux",
+            "-c",
+            "sudo umount -l /workspace 2>/dev/null || true",
+        ],
+        envs,
+    );
 
     let _ = Command::new("VBoxManage")
-        .args(["sharedfolder", "remove", "FORGE-LINUX", "--name", "workspace", "--transient"])
+        .args([
+            "sharedfolder",
+            "remove",
+            "FORGE-LINUX",
+            "--name",
+            "workspace",
+            "--transient",
+        ])
         .output();
     let _ = Command::new("VBoxManage")
         .args([
@@ -318,7 +436,15 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
     log_info("Ejecutando proceso de compilacion remota aislada...");
     let full_script = format!("{}{}", mount_prefix, build_script);
     let success = run_vagrant_streaming(&["ssh", "forge-linux", "-c", &full_script], envs)?;
-    let _ = run_vagrant_streaming(&["ssh", "forge-linux", "-c", "sudo umount -l /workspace 2>/dev/null || true"], envs);
+    let _ = run_vagrant_streaming(
+        &[
+            "ssh",
+            "forge-linux",
+            "-c",
+            "sudo umount -l /workspace 2>/dev/null || true",
+        ],
+        envs,
+    );
 
     if !args.keep_vm {
         log_info("Liberando memoria del host (apagando forge-linux)...");
@@ -333,6 +459,7 @@ fn build_on_linux(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) 
 }
 
 fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) -> Result<()> {
+    ensure_mutual_exclusion("forge-windows")?;
     log_info("Preparando entorno de compilacion en 'forge-windows'...");
     let mut up_args = vec!["up", "forge-windows"];
     if args.update {
@@ -340,33 +467,74 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
     }
     run_vagrant_streaming(&up_args, envs)?;
 
+    // Attach transient shared folder for dynamic workspace mounting
+    let project_canonical = args
+        .project
+        .canonicalize()
+        .unwrap_or_else(|_| args.project.clone());
+
+    let _ = Command::new("VBoxManage")
+        .args([
+            "sharedfolder",
+            "remove",
+            "FORGE-WINDOWS",
+            "--name",
+            "workspace",
+            "--transient",
+        ])
+        .output();
+    let _ = Command::new("VBoxManage")
+        .args([
+            "sharedfolder",
+            "add",
+            "FORGE-WINDOWS",
+            "--name",
+            "workspace",
+            "--hostpath",
+            &project_canonical.to_string_lossy(),
+            "--transient",
+        ])
+        .output();
+
+    let link_ps = "if (Test-Path C:\\workspace) { cmd /c rmdir C:\\workspace 2>$null; Remove-Item -Force -Recurse C:\\workspace 2>$null }; cmd /c \"mklink /D C:\\workspace \\\\VBoxSvr\\workspace\" ; ";
+
     let clean_ps = if args.clean {
-        "if (Test-Path C:\\target) { Remove-Item -Recurse -Force C:\\target }; "
+        "if (Test-Path C:\\target) { Remove-Item -Recurse -Force C:\\target 2>$null }; "
     } else {
         ""
     };
 
     let build_ps = match ptype {
         ProjectType::Rust | ProjectType::RustTauri => format!(
-            "{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force",
-            clean_ps
+            "{}{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Copy-Item C:\\target\\release\\*.exe C:\\workspace\\dist\\ -Force",
+            link_ps, clean_ps
         ),
         ProjectType::CCpp => format!(
-            "{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; Copy-Item C:\\target\\*.exe C:\\workspace\\dist\\ -Force",
-            clean_ps
+            "{}{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; Copy-Item C:\\target\\*.exe C:\\workspace\\dist\\ -Force",
+            link_ps, clean_ps
         ),
         ProjectType::Go => format!(
-            "{}Set-Location C:\\workspace; go build -o C:\\workspace\\dist\\",
-            clean_ps
+            "{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; go build -o C:\\workspace\\dist\\",
+            link_ps, clean_ps
         ),
         _ => format!(
-            "{}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{{{ .\\build.bat }}}}",
-            clean_ps
+            "{}{}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}",
+            link_ps, clean_ps
         ),
     };
 
     log_info("Ejecutando proceso de compilacion remota en Windows Server Core...");
-    let success = run_vagrant_streaming(&["winrm", "-c", &build_ps, "forge-windows"], envs)?;
+    let success = run_vagrant_streaming(
+        &[
+            "winrm",
+            "forge-windows",
+            "-s",
+            "powershell",
+            "-c",
+            &build_ps,
+        ],
+        envs,
+    )?;
 
     if !args.keep_vm {
         log_info("Liberando memoria del host (apagando forge-windows)...");
@@ -374,7 +542,7 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
     }
 
     if !success {
-        log_warn("Proceso en Windows finalizo con advertencias o error.");
+        anyhow::bail!("Fallo en la compilacion en forge-windows");
     }
 
     Ok(())

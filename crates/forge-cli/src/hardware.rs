@@ -136,10 +136,10 @@ pub fn compute_vcpus(physical_cores: usize) -> usize {
 
 pub fn compute_vm_ram(total_ram_gb: u64) -> u64 {
     match total_ram_gb {
-        0..=8 => 4096,
-        9..=20 => 5120,   // 16 GB host -> 5120 MB (~5 GB)
-        21..=40 => 10240, // 32 GB host -> 10240 MB (~10 GB)
-        41..=80 => 20480, // 64 GB host -> 20480 MB (~20 GB)
+        0..=8 => 3072,
+        9..=20 => 4096,   // 16 GB host -> 4096 MB (safe headroom for host)
+        21..=40 => 8192,  // 32 GB host -> 8192 MB
+        41..=80 => 16384, // 64 GB host -> 16384 MB
         _ => (total_ram_gb * 1024) / 3,
     }
 }
@@ -160,11 +160,11 @@ mod tests {
 
     #[test]
     fn test_compute_vm_ram() {
-        assert_eq!(compute_vm_ram(4), 4096);
-        assert_eq!(compute_vm_ram(8), 4096);
-        assert_eq!(compute_vm_ram(16), 5120);
-        assert_eq!(compute_vm_ram(32), 10240);
-        assert_eq!(compute_vm_ram(64), 20480);
+        assert_eq!(compute_vm_ram(4), 3072);
+        assert_eq!(compute_vm_ram(8), 3072);
+        assert_eq!(compute_vm_ram(16), 4096);
+        assert_eq!(compute_vm_ram(32), 8192);
+        assert_eq!(compute_vm_ram(64), 16384);
         assert_eq!(compute_vm_ram(128), (128 * 1024) / 3);
     }
 }

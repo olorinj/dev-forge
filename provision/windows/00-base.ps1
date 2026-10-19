@@ -31,7 +31,7 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
 }
 
 # Utilidades esenciales
-choco install -y git 7zip jq curl cmake
+choco install -y git 7zip jq curl cmake ninja
 
 # Activación de Windows 11
 Write-Host "Activando Windows 11..." -ForegroundColor Gray

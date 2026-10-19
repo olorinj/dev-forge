@@ -42,6 +42,7 @@ fn main() {
 
     let mut string_input: Option<String> = None;
     let mut file_input: Option<String> = None;
+    #[allow(unused_mut, unused_variables)]
     let mut force_gui = false;
     let mut json_mode = false;
 
@@ -70,7 +71,14 @@ fn main() {
                 json_mode = true;
             }
             "-g" | "--gui" => {
-                force_gui = true;
+                #[cfg(feature = "gui")]
+                {
+                    force_gui = true;
+                }
+                #[cfg(not(feature = "gui"))]
+                {
+                    eprintln!("Advertencia: hashforge fue compilado sin soporte GUI.");
+                }
             }
             "-h" | "--help" => {
                 print_help();
