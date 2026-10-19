@@ -102,8 +102,11 @@ dev-forge build --project /ruta/a/mi-proyecto --target all
 # Compilar proyecto en Java (JAR)
 dev-forge build --project /ruta/a/mi-app-java --target linux
 
-# Compilar script Python en un ejecutable Windows PE32+
+# Compilar script Python en un ejecutable Windows PE32+ (PyInstaller)
 dev-forge build --project /ruta/a/mi-script --target windows
+
+# Compilar script Python con Nuitka (Ahead-of-Time C nativo, mitigación EDR/Antivirus)
+dev-forge build --project /ruta/a/mi-script --target windows --compiler nuitka
 ```
 
 #### En Windows (PowerShell):
@@ -116,6 +119,9 @@ dev-forge build --project /ruta/a/mi-script --target windows
 
 # Compilar ejecutable nativo Windows con MSVC
 .\bin\dev-forge.ps1 build -p C:\proyectos\mi-script -t windows
+
+# Compilar Python con Nuitka (Ahead-of-Time C)
+.\bin\dev-forge.ps1 build -p C:\proyectos\mi-script -t windows -c nuitka
 ```
 
 ### 2. Gestión de Máquinas Virtuales
@@ -168,6 +174,21 @@ dev-forge clean-cache -s cargo       # Limpiar solo la caché de un subsistema (
 .\bin\dev-forge.ps1 doctor
 .\bin\dev-forge.ps1 clean-cache
 .\bin\dev-forge.ps1 clean-cache -s cargo
+```
+
+### 5. Configuración de Entornos de Desarrollo en VS Code (`ide`)
+
+`dev-forge` permite convertir la máquina virtual `forge-linux` en un entorno de desarrollo interactivo para VS Code conectado vía SSH con todas las herramientas nativas del lenguaje:
+
+```bash
+# Configurar entorno para Rust (rust-analyzer, lldb, tareas cargo)
+dev-forge ide setup-vscode -p /ruta/a/mi-proyecto --profile rust
+
+# Configurar entorno para Python (intérprete VM, ruff)
+dev-forge ide setup-vscode -p /ruta/a/mi-proyecto --profile python
+
+# Otros perfiles disponibles: go, java, c
+dev-forge ide setup-vscode -p /ruta/a/mi-proyecto --profile go
 ```
 
 ---

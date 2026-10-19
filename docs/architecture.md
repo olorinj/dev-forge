@@ -23,10 +23,10 @@ flowchart TD
         Agents[".agents -> /home/olorinj/DEV/.agents/"]
         
         subgraph VM_Linux["forge-linux (Debian 12)"]
-            L_Base["Toolchain Base (GCC, Clang, Mold, LLD)"]
-            L_Rust["Rustup (GNU + Musl + Apple Darwin targets)"]
+            L_Base["Toolchain Base (GCC, Clang, Mold, LLD, Fuse3)"]
+            L_Rust["Rustup (GNU + Musl + Darwin targets) + Tauri"]
             L_Java["OpenJDK 21 LTS + Gradle"]
-            L_Py["Python 3.12 + Pyenv + UV + PyInstaller"]
+            L_Py["Python 3.12 + UV + PyInstaller + Nuitka"]
             L_Go["Go 1.23.2 Toolchain"]
             L_Node["Node.js 20 LTS + Corepack (pnpm, yarn)"]
             L_Mac["Docker + osxcross + dmgbuild + rcodesign"]
@@ -36,8 +36,8 @@ flowchart TD
             W_MSVC["Visual Studio 2022 Community (MSVC + Windows SDK)"]
             W_Rust["Rust MSVC Toolchain (x86_64-pc-windows-msvc)"]
             W_Java["OpenJDK 21 LTS + Gradle Windows"]
-            W_PyGo["Python 3.12 + Go Toolchain"]
-            W_Pack["WiX Toolset v3/v4 + InnoSetup"]
+            W_PyGo["Python 3.12 (PyInstaller + Nuitka) + Go Toolchain"]
+            W_Pack["WiX Toolset v3/v4 (.msi) + InnoSetup (-setup.exe)"]
         end
     end
 
@@ -122,6 +122,26 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
 - Los artefactos intermedios activos permanecen aislados en discos rápidos locales (`/tmp/cargo-target`, `C:\target`) para evitar bloqueos de red `vboxsf`, mientras que las descargas de paquetes se benefician de la persistencia en el host.
 - El usuario puede purgar la caché en cualquier momento mediante `dev-forge clean-cache [--subsystem <nombre>]`.
 
+### 4.7 Bypass de FUSE para AppImages y Bundles de Tauri en Linux Headless
+- En compilaciones para Linux (`forge-linux`), el empaquetado de Tauri invoca internamente `linuxdeploy` para generar paquetes `.AppImage`. Dado que `linuxdeploy` es a su vez un ejecutable AppImage, su ejecución en entornos virtualizados headless o contenedores falla si requiere montar `/dev/fuse`.
+- `dev-forge` inyecta automáticamente:
+  - `export APPIMAGE_EXTRACT_AND_RUN=1`: Fuerza a los AppImages a auto-extraerse en `/tmp` y ejecutarse directamente sin requerir llamadas al sistema de montaje FUSE.
+  - `export NO_STRIP=1`: Previene fallos de stripping en bibliotecas compartidas complejas empaquetadas por `linuxdeploy`.
+- **Recolección Multi-Ruta de Bundles**: Debido al aislamiento en `/tmp/cargo-target`, Tauri genera los paquetes en `/tmp/cargo-target/release/bundle/`. El recolector de `dev-forge` escanea recursivamente tanto `/tmp/cargo-target/release/bundle/` como `src-tauri/target/release/bundle/` y copia todos los paquetes `.deb`, `.rpm` y `.AppImage` hacia `/workspace/dist/`.
+
+### 4.8 Sanitización Determinista de Versiones Semver para WiX Toolset
+- Las especificaciones del instalador de Windows (MSI) y de WiX Toolset exigen estrictamente números enteros en formato `Major.Minor.Build` (`Major <= 255`, `Minor <= 255`, `Build <= 65535`). Las etiquetas Semver convencionales (ej. `2.0.1-beta.1` o `1.0.0+build.42`) provocan fallos de sintaxis en `candle.exe`.
+- `dev-forge` incorpora un motor de sanitización de versión:
+  - Extrae la versión del manifiesto (`Cargo.toml`, `pyproject.toml`, `package.json`) o del árbol Git (`git describe --tags`).
+  - Limpia y formatea los 3 componentes enteros requeridos por WiX (ej. `2.0.1`), asegurando la validez del MSI.
+  - Conserva la versión semver completa en los nombres de archivo y en la metadata amigable de Inno Setup (`AppVersion`).
+
+### 4.9 Compilación C Ahead-of-Time con Nuitka para Python (Anti-EDR/Antivirus)
+- Los empaquetadores basados en cargadores ejecutables (como PyInstaller) empaquetan el runtime de Python y el bytecode comprimido, lo que a menudo dispara falsas alarmas heurísticas en motores antivirus y soluciones EDR corporativas en Windows.
+- `dev-forge` soporta compilación mediante Nuitka (`--compiler nuitka`):
+  - Transpila el código fuente Python a código C nativo y lo compila con GCC (Linux) o MSVC (Windows).
+  - Produce ejecutables totalmente autónomos (`--standalone --onefile`) de arranque instantáneo y resistentes a bloqueos heurísticos.
+
 ---
 
 ## 5. Ergonomía del Entorno y Estabilidad Operativa
@@ -146,5 +166,16 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
   - **Detección Host**: En Linux anfitrión inspecciona `localectl`, `/etc/default/keyboard`, `setxkbmap` y `$LANG`. En Windows anfitrión consulta `Get-WinUserLanguageList` y `CultureInfo`.
   - **Mapeo Biyectivo**: Normaliza el código de distribución (ej. `es`, `us`, `fr`, `de`, `latam`) y lo traduce al identificador de consola Linux (ej. `es`) y a la etiqueta BCP-47 de Windows (ej. `es-ES`, `en-US`, `fr-FR`).
   - **Aprovisionamiento**: Se inyecta como parámetro en los scripts de aprovisionamiento base (`00-base.sh` en Linux y `00-base.ps1` en Windows), garantizando una experiencia de teclado 100% fiel al host físico del desarrollador sin mapeos manuales.
+
+### 5.4 Entornos de Desarrollo Remoto con VS Code (`dev-forge ide`)
+- Para desarrolladores que prefieren programar directamente dentro del entorno virtualizado (con todas las herramientas y bibliotecas nativas preinstaladas), el CLI ofrece el comando:
+  ```bash
+  dev-forge ide setup-vscode --project /ruta/a/mi-proyecto --profile rust
+  ```
+- **Capacidades**:
+  - Extrae automáticamente la configuración SSH activa de la máquina virtual (`vagrant ssh-config`).
+  - Genera dentro del proyecto la carpeta `.vscode/` con `launch.json`, `tasks.json`, `settings.json` y recomendaciones de extensiones adaptadas al lenguaje (`rust`, `python`, `go`, `java`, `c`).
+  - Permite abrir VS Code y conectarse transparentemente a `forge-linux` usando la extensión *Remote - SSH*.
+
 
 
