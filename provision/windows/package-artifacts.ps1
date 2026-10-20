@@ -183,8 +183,18 @@ if (-not $light) {
     if (Test-Path $fallbackLight) { $light = $fallbackLight }
 }
 
-foreach ($exe in $exeFiles) {
-    $baseName = $exe.BaseName
+$targetExes = @()
+$guiExe = $exeFiles | Where-Object { $_.Name -match "(?i)gui" } | Select-Object -First 1
+if ($guiExe) {
+    $targetExes += $guiExe
+} else {
+    $targetExes = $exeFiles
+}
+
+foreach ($exe in $targetExes) {
+    $rawBaseName = $exe.BaseName
+    $cleanAppName = $rawBaseName -replace '-(gui|cli)-windows\.x86_64$', ''
+    $baseName = $cleanAppName
     $exeFullName = $exe.FullName
     Write-Host "[dev-forge : packager] Empaquetando `"$baseName`" ($displayVersion)..." -ForegroundColor Cyan
 

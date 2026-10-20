@@ -227,11 +227,13 @@ pub fn extract_project_version(path: &Path) -> ProjectVersionInfo {
         if pkg_path.is_file() {
             if let Ok(content) = std::fs::read_to_string(&pkg_path) {
                 for line in content.lines() {
-                    let trimmed = line.trim();
-                    if trimmed.starts_with("\"version\"") {
-                        if let Some(val) = extract_quoted_value(trimmed) {
-                            raw_version = Some(val);
-                            break;
+                    if let Some(idx) = line.find("\"version\"") {
+                        let rest = &line[idx + 9..];
+                        if let Some(colon_idx) = rest.find(':') {
+                            if let Some(val) = extract_quoted_value(&rest[colon_idx + 1..]) {
+                                raw_version = Some(val);
+                                break;
+                            }
                         }
                     }
                 }
@@ -283,6 +285,83 @@ pub fn extract_project_version(path: &Path) -> ProjectVersionInfo {
         branch,
         commit,
     }
+}
+
+pub fn extract_project_name(path: &Path) -> String {
+    // 1. Cargo.toml
+    let cargo_path = path.join("Cargo.toml");
+    if cargo_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&cargo_path) {
+            let mut in_package = false;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    in_package = trimmed == "[package]";
+                } else if in_package && trimmed.starts_with("name") {
+                    if let Some(val) = extract_quoted_value(trimmed) {
+                        return val;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. pyproject.toml
+    let pyproject_path = path.join("pyproject.toml");
+    if pyproject_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&pyproject_path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("name") {
+                    if let Some(val) = extract_quoted_value(trimmed) {
+                        return val;
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. package.json
+    let pkg_path = path.join("package.json");
+    if pkg_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&pkg_path) {
+            for line in content.lines() {
+                if let Some(idx) = line.find("\"name\"") {
+                    let rest = &line[idx + 6..];
+                    if let Some(colon_idx) = rest.find(':') {
+                        if let Some(val) = extract_quoted_value(&rest[colon_idx + 1..]) {
+                            let name = val.rsplit('/').next().unwrap_or(&val);
+                            return name.to_string();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. CMakeLists.txt
+    let cmake_path = path.join("CMakeLists.txt");
+    if cmake_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&cmake_path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("project(") {
+                    let rest = trimmed.trim_start_matches("project(").trim_start();
+                    let name: String = rest
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                        .collect();
+                    if !name.is_empty() {
+                        return name;
+                    }
+                }
+            }
+        }
+    }
+
+    path.file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "app".to_string())
 }
 
 fn extract_quoted_value(line: &str) -> Option<String> {
@@ -451,5 +530,32 @@ mod tests {
         assert_eq!(sanitize_wix_version("2.0.0-beta.1"), "2.0.0");
         assert_eq!(sanitize_wix_version("42"), "42.0.0");
         assert_eq!(sanitize_wix_version("0.1"), "0.1.0");
+    }
+
+    #[test]
+    fn test_extract_project_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(
+            tmp.path().join("Cargo.toml"),
+            "[package]\nname = \"lexishield\"\nversion = \"2.0.1\"\n",
+        )
+        .unwrap();
+        assert_eq!(extract_project_name(tmp.path()), "lexishield");
+
+        let tmp_py = tempfile::tempdir().unwrap();
+        fs::write(
+            tmp_py.path().join("pyproject.toml"),
+            "[project]\nname = \"hashforge-py\"\n",
+        )
+        .unwrap();
+        assert_eq!(extract_project_name(tmp_py.path()), "hashforge-py");
+
+        let tmp_pkg = tempfile::tempdir().unwrap();
+        fs::write(
+            tmp_pkg.path().join("package.json"),
+            "{\"name\": \"@org/web-app\"}",
+        )
+        .unwrap();
+        assert_eq!(extract_project_name(tmp_pkg.path()), "web-app");
     }
 }

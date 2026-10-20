@@ -101,5 +101,23 @@ class TestDevForge(unittest.TestCase):
             self.assertIn("rust-lang.rust-analyzer", content)
 
 
+    def test_extract_project_name(self):
+        from dev_forge.detector import extract_project_name
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "Cargo.toml").write_text('[package]\nname = "lexishield"\nversion = "2.0.1"', encoding="utf-8")
+            self.assertEqual(extract_project_name(p), "lexishield")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "pyproject.toml").write_text('[project]\nname = "hashforge-py"\n', encoding="utf-8")
+            self.assertEqual(extract_project_name(p), "hashforge-py")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "package.json").write_text('{"name": "@org/web-app"}', encoding="utf-8")
+            self.assertEqual(extract_project_name(p), "web-app")
+
+
 if __name__ == "__main__":
     unittest.main()

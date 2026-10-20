@@ -234,6 +234,70 @@ def extract_project_version(path: Path) -> ProjectVersionInfo:
     )
 
 
+def extract_project_name(path: Path) -> str:
+    """Extract base project name from Cargo.toml, pyproject.toml, package.json, or directory name."""
+    cargo_path = path / "Cargo.toml"
+    if cargo_path.is_file():
+        try:
+            content = cargo_path.read_text(encoding="utf-8")
+            in_pkg = False
+            for line in content.splitlines():
+                s = line.strip()
+                if s.startswith("[") and s.endswith("]"):
+                    in_pkg = s == "[package]"
+                elif in_pkg and s.startswith("name"):
+                    parts = s.split('"')
+                    if len(parts) >= 3:
+                        return parts[1]
+                    parts_sq = s.split("'")
+                    if len(parts_sq) >= 3:
+                        return parts_sq[1]
+        except Exception:
+            pass
+
+    py_path = path / "pyproject.toml"
+    if py_path.is_file():
+        try:
+            content = py_path.read_text(encoding="utf-8")
+            for line in content.splitlines():
+                s = line.strip()
+                if s.startswith("name"):
+                    parts = s.split('"')
+                    if len(parts) >= 3:
+                        return parts[1]
+                    parts_sq = s.split("'")
+                    if len(parts_sq) >= 3:
+                        return parts_sq[1]
+        except Exception:
+            pass
+
+    pkg_path = path / "package.json"
+    if pkg_path.is_file():
+        try:
+            import json
+            data = json.loads(pkg_path.read_text(encoding="utf-8"))
+            if "name" in data and isinstance(data["name"], str):
+                return data["name"].split("/")[-1]
+        except Exception:
+            pass
+
+    cmake_path = path / "CMakeLists.txt"
+    if cmake_path.is_file():
+        try:
+            content = cmake_path.read_text(encoding="utf-8")
+            for line in content.splitlines():
+                s = line.strip()
+                if s.startswith("project("):
+                    rest = s[len("project(") :].strip()
+                    name = "".join(c for c in rest if c.isalnum() or c in ("_", "-"))
+                    if name:
+                        return name
+        except Exception:
+            pass
+
+    return path.resolve().name or "app"
+
+
 def _extract_git_info(path: Path) -> tuple[str, str]:
     import subprocess
     branch = ""
