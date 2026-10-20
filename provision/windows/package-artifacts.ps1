@@ -146,7 +146,8 @@ if (-not $GitBranch -and (Test-Path (Join-Path $WorkspaceDir ".git"))) {
     } catch {}
 }
 
-$displayVersion = if ($GitBranch) { "$AppVersion-$GitBranch" } else { $AppVersion }
+$cleanBranch = if ($GitBranch) { ($GitBranch -replace '[/\\:*?"<>|]', '-').Trim('-') } else { "" }
+$displayVersion = if ($cleanBranch) { "$AppVersion-$cleanBranch" } else { $AppVersion }
 
 if (-not $WixVersion) {
     # WiX requires strict Major.Minor.Build format (e.g. 1.2.3)

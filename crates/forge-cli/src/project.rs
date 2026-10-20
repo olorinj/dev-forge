@@ -267,8 +267,9 @@ pub fn extract_project_version(path: &Path) -> ProjectVersionInfo {
 
     let (branch, commit) = extract_git_info(path);
 
-    let display = if !branch.is_empty() && branch != "HEAD" {
-        format!("{}-{}", raw, branch)
+    let safe_branch = branch.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "-");
+    let display = if !safe_branch.is_empty() && safe_branch != "HEAD" {
+        format!("{}-{}", raw, safe_branch)
     } else {
         raw.clone()
     };

@@ -59,12 +59,12 @@ if [ "$SWAP_TOTAL" -lt 3000 ]; then
   fi
 fi
 
-# 2. Configurar tmpfs en RAM para /tmp (2 GB)
-log "Configurando tmpfs en RAM para /tmp (2 GB)..."
-if ! grep -q "tmpfs /tmp tmpfs" /etc/fstab; then
-  echo "tmpfs /tmp tmpfs defaults,noatime,mode=1777,size=2G 0 0" >> /etc/fstab
+# 2. Asegurar espacio amplio para compiladores en /tmp (evitar que tmpfs agote la RAM/disco)
+log "Asegurando espacio amplio para compiladores en /tmp (sistema de archivos raíz)..."
+sed -i '/tmpfs \/tmp tmpfs/d' /etc/fstab
+if mountpoint -q /tmp; then
+  umount -l /tmp 2>/dev/null || true
 fi
-mount -o remount,size=2G /tmp 2>/dev/null || mount /tmp 2>/dev/null || true
 
 # 3. Directorios de caché persistentes en NVMe para ccache y sccache
 log "Configurando directorios de caché persistentes en NVMe para ccache y sccache..."

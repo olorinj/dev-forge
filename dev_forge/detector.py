@@ -221,7 +221,8 @@ def extract_project_version(path: Path) -> ProjectVersionInfo:
     # Git metadata
     branch, commit = _extract_git_info(path)
 
-    display = f"{raw}-{branch}" if (branch and branch != "HEAD") else raw
+    safe_branch = re.sub(r'[/\\:*?"<>|]', '-', branch) if branch else ""
+    display = f"{raw}-{safe_branch}" if (safe_branch and safe_branch != "HEAD") else raw
     wix = _sanitize_wix_version(raw)
 
     return ProjectVersionInfo(

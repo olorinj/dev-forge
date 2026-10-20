@@ -16,9 +16,8 @@ for target in $TARGETS; do
   su - vagrant -c "rustup target add $target" 2>/dev/null || true
 done
 
-# Exportar PATH de Cargo globalmente
 # Exportar PATH y CARGO_TARGET_DIR globalmente
-echo 'export PATH="/home/vagrant/.cargo/bin:/root/.cargo/bin:$PATH"' > /etc/profile.d/rust.sh
+echo 'export PATH="/home/vagrant/.cargo/bin:$PATH"' > /etc/profile.d/rust.sh
 echo 'export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/tmp/cargo-target}"' >> /etc/profile.d/rust.sh
 chmod +x /etc/profile.d/rust.sh
 ln -sf /root/.cargo/bin/* /usr/local/bin/ 2>/dev/null || true
@@ -44,8 +43,8 @@ fi
 # Instalar CLI de Tauri precompilado (cargo-tauri)
 if ! command -v cargo-tauri >/dev/null 2>&1; then
   echo "Instalando binario oficial precompilado de cargo-tauri..."
-  /root/.cargo/bin/cargo-binstall -y --no-confirm tauri-cli 2>/dev/null || true
-  su - vagrant -c 'cargo-binstall -y --no-confirm tauri-cli' 2>/dev/null || true
+  /root/.cargo/bin/cargo-binstall --no-confirm tauri-cli 2>/dev/null || true
+  su - vagrant -c 'cargo-binstall --no-confirm tauri-cli' 2>/dev/null || true
   ln -sf /root/.cargo/bin/cargo-tauri /usr/local/bin/cargo-tauri 2>/dev/null || true
   ln -sf /home/vagrant/.cargo/bin/cargo-tauri /usr/local/bin/cargo-tauri 2>/dev/null || true
 fi
