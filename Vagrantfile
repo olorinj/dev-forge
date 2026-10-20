@@ -118,15 +118,14 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
     end
 
-    # Aprovisionamiento modular por etapas
-    linux.vm.provision "shell", path: "provision/linux/00-base.sh", args: [linux_layout]
-    linux.vm.provision "shell", path: "provision/linux/optimize-level2-recommended.sh"
-    linux.vm.provision "shell", path: "provision/linux/10-rust.sh"
-    linux.vm.provision "shell", path: "provision/linux/20-python.sh"
-    linux.vm.provision "shell", path: "provision/linux/30-go.sh"
-    linux.vm.provision "shell", path: "provision/linux/40-node.sh"
-    linux.vm.provision "shell", path: "provision/linux/50-java.sh"
-    linux.vm.provision "shell", path: "provision/linux/60-macos-cross.sh"
+    # Aprovisionamiento declarativo e idempotente con Ansible
+    linux.vm.provision "ansible" do |ansible|
+      ansible.playbook = "provision/ansible/linux.yml"
+      ansible.compatibility_mode = "2.0"
+      ansible.extra_vars = {
+        host_keyboard: linux_layout
+      }
+    end
   end
 
   # ===========================================================================
@@ -159,16 +158,14 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
     end
 
-    # Aprovisionamiento modular por etapas en Windows
-    win.vm.provision "shell", path: "provision/windows/00-base.ps1", args: ["-LanguageTag", win_lang_tag]
-    win.vm.provision "shell", path: "provision/windows/optimize-level2-recommended.ps1"
-    win.vm.provision "shell", path: "provision/windows/10-msvc.ps1"
-    win.vm.provision "shell", path: "provision/windows/20-rust-msvc.ps1"
-    win.vm.provision "shell", path: "provision/windows/30-python.ps1"
-    win.vm.provision "shell", path: "provision/windows/40-go.ps1"
-    win.vm.provision "shell", path: "provision/windows/50-node.ps1"
-    win.vm.provision "shell", path: "provision/windows/60-java.ps1"
-    win.vm.provision "shell", path: "provision/windows/70-packagers.ps1"
+    # Aprovisionamiento declarativo e idempotente con Ansible sobre WinRM
+    win.vm.provision "ansible" do |ansible|
+      ansible.playbook = "provision/ansible/windows.yml"
+      ansible.compatibility_mode = "2.0"
+      ansible.extra_vars = {
+        host_language_tag: win_lang_tag
+      }
+    end
   end
 end
 

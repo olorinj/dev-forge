@@ -116,6 +116,12 @@ $exeFiles = Get-ChildItem -Path $DistDir -Filter "*.exe" | Where-Object {
     $_.Name -notmatch "(?i)(-setup\.exe|_setup\.exe|\.tmp)"
 }
 
+# Si existen binarios con la nomenclatura semántica (*-windows.x86_64.exe), ignorar residuos antiguos
+$semanticExes = $exeFiles | Where-Object { $_.Name -match '-(cli|gui)-windows\.x86_64\.exe$' }
+if ($semanticExes -and $semanticExes.Count -gt 0) {
+    $exeFiles = $semanticExes
+}
+
 if (-not $exeFiles -or $exeFiles.Count -eq 0) {
     exit 0
 }

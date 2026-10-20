@@ -1,14 +1,14 @@
-﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿param(
+    [switch]$Rollback = $false
+)
+
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 # =============================================================================
 # dev-forge : Optimization Level 1 (Conservative)
 # Scope: Essential Services, Ultimate Performance Power Plan, Defender Exclusions
 # =============================================================================
-
-param(
-    [switch]$Rollback = $false
-)
 
 # 1. Administrator Check
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -152,7 +152,10 @@ if ($LASTEXITCODE -ne 0) {
     Write-Log "Activado esquema Ultimate Performance." "SUCCESS"
 }
 
-# 4. Exclusiones de Microsoft Defender
+# 4. Exclusiones y Desactivación de Monitoreo en Tiempo Real de Microsoft Defender
+Write-Log "Desactivando monitoreo en tiempo real de Microsoft Defender (evita bloqueos de compilacion)..."
+Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -DisableIOAVProtection $true -DisableScriptScanning $true -ErrorAction SilentlyContinue
+
 Write-Log "Aplicando exclusiones de carpetas, procesos y extensiones en Microsoft Defender..."
 foreach ($path in $ExclusionPaths) {
     if (-not (Test-Path $path)) { New-Item -ItemType Directory -Path $path -Force | Out-Null }

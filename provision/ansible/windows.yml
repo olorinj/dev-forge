@@ -1,0 +1,180 @@
+---
+- name: Aprovisionamiento y optimización de forge-windows (Windows Server 2022 Core)
+  hosts: all
+  vars:
+    host_language_tag: "{{ host_language_tag | default('es-ES') }}"
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # 1. OPTIMIZACIÓN Y DESACTIVACIÓN DE MONITOREO DE DEFENDER
+    # -------------------------------------------------------------------------
+    - name: Desactivar Real-time Monitoring y Behavior Monitoring de Defender (elimina Access is denied en compilaciones)
+      ansible.windows.win_powershell:
+        script: |
+          Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -DisableIOAVProtection $true -DisableScriptScanning $true -ErrorAction SilentlyContinue
+
+    - name: Configurar exclusiones de carpetas y procesos en Defender
+      ansible.windows.win_powershell:
+        script: |
+          $paths = @('C:\target', 'C:\workspace', 'C:\forge', 'C:\forge-cache', 'C:\Users\vagrant\.cargo', 'C:\tmp')
+          foreach ($p in $paths) {
+            if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
+            Add-MpPreference -ExclusionPath $p -ErrorAction SilentlyContinue
+          }
+          $procs = @('rustc.exe', 'cargo.exe', 'cargo-tauri.exe', 'cl.exe', 'link.exe', 'ninja.exe', 'cmake.exe', 'git.exe', 'python.exe', 'go.exe')
+          foreach ($pr in $procs) {
+            Add-MpPreference -ExclusionProcess $pr -ErrorAction SilentlyContinue
+          }
+
+    # -------------------------------------------------------------------------
+    # 2. MINIMIZACIÓN DE SERVICIOS EN SEGUNDO PLANO
+    # -------------------------------------------------------------------------
+    - name: Deshabilitar servicios innecesarios para compilación headless en Windows
+      ansible.windows.win_service:
+        name: "{{ item }}"
+        start_mode: disabled
+        state: stopped
+      loop:
+        - wuauserv       # Windows Update
+        - Spooler        # Print Spooler
+        - DPS            # Diagnostic Policy Service
+        - WerSvc         # Windows Error Reporting
+        - DiagTrack      # Connected User Experiences and Telemetry
+        - SysMain        # Superfetch / Prefetch
+        - WSearch        # Windows Search / Indexer
+        - bthserv        # Bluetooth Support
+        - MapsBroker     # Downloaded Maps Manager
+        - lfsvc          # Geolocation Service
+      failed_when: false
+
+    # -------------------------------------------------------------------------
+    # 3. RENDIMIENTO DEL SISTEMA Y RECURSOS
+    # -------------------------------------------------------------------------
+    - name: Configurar esquema de energía Ultimate Performance
+      ansible.windows.win_powershell:
+        script: |
+          $UltimateGUID = "e9a42b02-d5df-448d-aa00-03f14749eb61"
+          $HighPerfGUID = "8c5e7fda-e8f1-4a01-9f58-3097d2d61f16"
+          $res = powercfg -duplicatescheme $UltimateGUID 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            powercfg -duplicatescheme $HighPerfGUID 2>$null
+            powercfg /setactive $HighPerfGUID
+          } else {
+            powercfg /setactive $UltimateGUID
+          }
+
+    - name: Fijar archivo de paginación (Pagefile) a 4096 MB fijo en C:\pagefile.sys
+      ansible.windows.win_powershell:
+        script: |
+          $pagefile = Get-WmiObject Win32_PageFileSetting -ErrorAction SilentlyContinue
+          if ($pagefile) {
+            $pagefile.InitialSize = 4096
+            $pagefile.MaximumSize = 4096
+            $pagefile.Put() | Out-Null
+          } else {
+            Set-WmiInstance -Class Win32_PageFileSetting -Arguments @{Name="C:\pagefile.sys"; InitialSize=4096; MaximumSize=4096} -ErrorAction SilentlyContinue | Out-Null
+          }
+
+    - name: Ajustar cuota de memoria WinRM a 8192 MB
+      ansible.windows.win_powershell:
+        script: |
+          Set-Item -Path WSMan:\localhost\Shell\MaxMemoryPerShellMB -Value 8192 -Force -ErrorAction SilentlyContinue
+
+    - name: Sincronizar teclado y configuración regional con la del host
+      ansible.windows.win_powershell:
+        script: |
+          $lang = "{{ host_language_tag }}"
+          try {
+            Set-WinUserLanguageList -LanguageList (New-WinUserLanguageList $lang) -Force
+            Set-WinSystemLocale -SystemLocale $lang -ErrorAction SilentlyContinue
+            Set-Culture -CultureInfo $lang -ErrorAction SilentlyContinue
+          } catch {}
+
+    # -------------------------------------------------------------------------
+    # 4. INSTALACIÓN DE CHOCOLATEY Y PAQUETES BASE
+    # -------------------------------------------------------------------------
+    - name: Instalar paquetes esenciales y herramientas de compilación con Chocolatey
+      chocolatey.chocolatey.win_chocolatey:
+        name:
+          - git
+          - 7zip
+          - jq
+          - curl
+          - cmake
+          - ninja
+          - wixtoolset
+          - innosetup
+          - visualstudio2022buildtools
+        state: present
+
+    # -------------------------------------------------------------------------
+    # 5. TOOLCHAIN DE RUST (MSVC) Y TAURI CLI
+    # -------------------------------------------------------------------------
+    - name: Instalar Rustup y Toolchain estable (x86_64-pc-windows-msvc)
+      ansible.windows.win_powershell:
+        script: |
+          if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
+            $rustupInit = "$env:TEMP\rustup-init.exe"
+            & curl.exe -sSfL "https://win.rustup.rs/x86_64" -o $rustupInit
+            & $rustupInit -y --default-host x86_64-pc-windows-msvc --default-toolchain stable 2>&1 | Out-Null
+            Remove-Item -Force $rustupInit -ErrorAction SilentlyContinue
+          } else {
+            rustup update
+          }
+
+    - name: Asegurar variables de entorno globales de Cargo
+      ansible.windows.win_path:
+        elements:
+          - 'C:\Users\vagrant\.cargo\bin'
+        scope: machine
+        state: present
+
+    - name: Instalar cargo-binstall
+      ansible.windows.win_powershell:
+        script: |
+          $env:PATH = "C:\Users\vagrant\.cargo\bin;$env:PATH"
+          if (-not (Get-Command cargo-binstall.exe -ErrorAction SilentlyContinue)) {
+            & curl.exe -sSfL "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.ps1" -o "$env:TEMP\install-binstall.ps1"
+            & powershell.exe -ExecutionPolicy Bypass -File "$env:TEMP\install-binstall.ps1"
+            Remove-Item -Force "$env:TEMP\install-binstall.ps1" -ErrorAction SilentlyContinue
+          }
+
+    - name: Instalar binario nativo oficial de cargo-tauri (tauri-cli)
+      ansible.windows.win_powershell:
+        script: |
+          $env:PATH = "C:\Users\vagrant\.cargo\bin;$env:PATH"
+          if (-not (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue)) {
+            if (Get-Command cargo-binstall.exe -ErrorAction SilentlyContinue) {
+              & cargo-binstall.exe --no-confirm tauri-cli 2>&1 | Write-Host
+            }
+            if (-not (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue)) {
+              & cargo install tauri-cli --locked 2>&1 | Write-Host
+            }
+          }
+
+    # -------------------------------------------------------------------------
+    # 6. TOOLCHAIN DE PYTHON
+    # -------------------------------------------------------------------------
+    - name: Instalar Python 3.12 con Chocolatey
+      chocolatey.chocolatey.win_chocolatey:
+        name: python312
+        state: present
+
+    - name: Instalar herramientas de compilación de Python (pip --no-cache-dir, nuitka, pyinstaller)
+      ansible.windows.win_powershell:
+        script: |
+          $pyPath = "$env:ProgramFiles\Python312;$env:ProgramFiles\Python312\Scripts"
+          $env:PATH = "$pyPath;$env:PATH"
+          python -m pip install --no-cache-dir --upgrade pip nuitka pyinstaller wheel setuptools
+
+    # -------------------------------------------------------------------------
+    # 7. TOOLCHAINS DE GO, NODE.JS Y JAVA
+    # -------------------------------------------------------------------------
+    - name: Instalar Go, Node.js LTS, OpenJDK 21 y Gradle
+      chocolatey.chocolatey.win_chocolatey:
+        name:
+          - golang
+          - nodejs-lts
+          - openjdk21
+          - gradle
+        state: present

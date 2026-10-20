@@ -564,6 +564,16 @@ def build_on_windows(
         else ""
     )
 
+    defender_bypass = (
+        "Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -DisableIOAVProtection $true "
+        "-DisableScriptScanning $true -ErrorAction SilentlyContinue; "
+    )
+    clean_legacy = (
+        "if (Test-Path C:\\workspace\\dist) { "
+        "Get-ChildItem -Path C:\\workspace\\dist -Filter '*-amd64*' -ErrorAction SilentlyContinue | Remove-Item -Force }; "
+    )
+    path_init = "$env:PATH = \"$env:USERPROFILE\\.cargo\\bin;C:\\Users\\vagrant\\.cargo\\bin;$env:PATH\"; "
+
     vs_shell_init = (
         "if (Test-Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1') { "
         "& 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 | Out-Null }; "
@@ -574,6 +584,8 @@ def build_on_windows(
         "$env:CARGO_HOME='C:\\forge-cache\\cargo'; $env:GOMODCACHE='C:\\forge-cache\\go\\pkg\\mod'; $env:PIP_CACHE_DIR='C:\\forge-cache\\pip'; $env:GRADLE_USER_HOME='C:\\forge-cache\\gradle'; "
         "New-Item -ItemType Directory -Path C:\\forge-cache\\cargo, C:\\forge-cache\\go\\pkg\\mod, C:\\forge-cache\\pip, C:\\forge-cache\\gradle -Force | Out-Null }; "
     )
+
+    init_prefix = f"{defender_bypass}{clean_legacy}{path_init}{link_ps}{clean_ps}{cache_init}"
 
     app_name = extract_project_name(project_path)
     if (project_path / "src-tauri" / "Cargo.toml").is_file():
@@ -588,7 +600,7 @@ def build_on_windows(
 
     if ptype.kind == ProjectTypeKind.RUST_TAURI:
         build_ps = (
-            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; "
+            f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"cargo build --release; "
             f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}; "
@@ -602,7 +614,7 @@ def build_on_windows(
         )
     elif ptype.kind == ProjectTypeKind.RUST:
         build_ps = (
-            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
+            f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}"
         )
@@ -625,23 +637,23 @@ def build_on_windows(
                 f"Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
                 f"if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
             )
-        build_ps = f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {py_cmd}"
+        build_ps = f"{init_prefix}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {py_cmd}"
     elif ptype.kind == ProjectTypeKind.CCPP:
         build_ps = (
-            f"{link_ps}{clean_ps}{cache_init}{vs_shell_init}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; "
+            f"{init_prefix}{vs_shell_init}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Where-Object {{ $_.Name -notmatch '(?i)(ninja|compiler)' }} | Select-Object -First 1 | Copy-Item -Destination 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force"
         )
     elif ptype.kind == ProjectTypeKind.GO:
         build_ps = (
-            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; "
+            f"{init_prefix}Set-Location C:\\workspace; "
             f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
             f"go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' . ; "
             f"if (-not (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe')) {{ go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' ./... }}"
         )
     else:
         build_ps = (
-            f"{link_ps}{clean_ps}{cache_init}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}"
+            f"{init_prefix}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}"
         )
 
     pack_ps = (

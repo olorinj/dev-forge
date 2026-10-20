@@ -642,8 +642,16 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
         ""
     };
 
+    let defender_bypass = "Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -DisableIOAVProtection $true -DisableScriptScanning $true -ErrorAction SilentlyContinue; ";
+    let clean_legacy = "if (Test-Path C:\\workspace\\dist) { Get-ChildItem -Path C:\\workspace\\dist -Filter '*-amd64*' -ErrorAction SilentlyContinue | Remove-Item -Force }; ";
+    let path_init =
+        "$env:PATH = \"$env:USERPROFILE\\.cargo\\bin;C:\\Users\\vagrant\\.cargo\\bin;$env:PATH\"; ";
     let vs_shell_init = "if (Test-Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1') { & 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 | Out-Null }; ";
     let cache_init = "if (Test-Path C:\\forge-cache) { $env:CARGO_HOME='C:\\forge-cache\\cargo'; $env:GOMODCACHE='C:\\forge-cache\\go\\pkg\\mod'; $env:PIP_CACHE_DIR='C:\\forge-cache\\pip'; $env:GRADLE_USER_HOME='C:\\forge-cache\\gradle'; New-Item -ItemType Directory -Path C:\\forge-cache\\cargo, C:\\forge-cache\\go\\pkg\\mod, C:\\forge-cache\\pip, C:\\forge-cache\\gradle -Force | Out-Null }; ";
+    let init_prefix = format!(
+        "{}{}{}{}{}{}",
+        defender_bypass, clean_legacy, path_init, link_ps, clean_ps, cache_init
+    );
 
     let ver_info = extract_project_version(&project_canonical);
     let app_name = extract_project_name(&project_canonical);
@@ -656,7 +664,7 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
 
     let build_ps = match ptype {
         ProjectType::RustTauri => format!(
-            "{}{}{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; \
+            "{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; \
             if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
             cargo build --release; \
             if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}; \
@@ -667,13 +675,13 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
             elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} \
             elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }}; \
             if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}",
-            link_ps, clean_ps, cache_init
+            init_prefix
         ),
         ProjectType::Rust => format!(
-            "{}{}{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; \
+            "{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; \
             if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
             if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}",
-            link_ps, clean_ps, cache_init
+            init_prefix
         ),
         ProjectType::Python(_) => {
             let py_compile = if use_nuitka {
@@ -688,25 +696,25 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
                 )
             };
             format!(
-                "{}{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {}",
-                link_ps, clean_ps, cache_init, py_compile
+                "{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {}",
+                init_prefix, py_compile
             )
         }
         ProjectType::CCpp => format!(
-            "{}{}{}{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; \
+            "{}{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; \
             if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
             Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Where-Object {{ $_.Name -notmatch '(?i)(ninja|compiler)' }} | Select-Object -First 1 | Copy-Item -Destination 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force",
-            link_ps, clean_ps, cache_init, vs_shell_init
+            init_prefix, vs_shell_init
         ),
         ProjectType::Go => format!(
-            "{}{}{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
+            "{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
             go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' . ; \
             if (-not (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe')) {{ go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' ./... }}",
-            link_ps, clean_ps, cache_init
+            init_prefix
         ),
         _ => format!(
-            "{}{}{}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}",
-            link_ps, clean_ps, cache_init
+            "{}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}",
+            init_prefix
         ),
     };
 

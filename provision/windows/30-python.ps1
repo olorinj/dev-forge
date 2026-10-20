@@ -20,7 +20,7 @@ if (-not $isRealPython) {
     $env:PATH = "$pyPath;$env:PATH"
 }
 
-python -m pip install --upgrade pip nuitka pyinstaller wheel setuptools
+python -m pip install --no-cache-dir --upgrade pip nuitka pyinstaller wheel setuptools
 
 Write-Host "=== [dev-forge : Windows] 30-python: Python $(python --version) configurado ===" -ForegroundColor Green
 

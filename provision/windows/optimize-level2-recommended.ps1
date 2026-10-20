@@ -1,4 +1,8 @@
-﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿param(
+    [switch]$Rollback = $false
+)
+
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 # =============================================================================
@@ -6,10 +10,6 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # Scope: Level 1 + Scheduled Tasks, Telemetry, Safe Memory/NTFS Registry,
 #        Fixed Pagefile, Build Environment Variables
 # =============================================================================
-
-param(
-    [switch]$Rollback = $false
-)
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {

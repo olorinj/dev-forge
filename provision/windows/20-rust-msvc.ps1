@@ -48,7 +48,10 @@ if (-not (Get-Command cargo-binstall.exe -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue)) {
     Write-Host "Instalando binario oficial de tauri-cli..." -ForegroundColor Gray
     if (Get-Command cargo-binstall.exe -ErrorAction SilentlyContinue) {
-        & cargo-binstall.exe -y --no-confirm tauri-cli 2>&1 | Write-Host
+        & cargo-binstall.exe --no-confirm tauri-cli 2>&1 | Write-Host
+    }
+    if (-not (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue)) {
+        & cargo install tauri-cli --locked 2>&1 | Write-Host
     }
 }
 
