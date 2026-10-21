@@ -447,6 +447,11 @@ fn build_on_linux(
 
     let ver_info = extract_project_version(&project_canonical);
     let app_name = extract_project_name(&project_canonical);
+    let raw_ver = if !ver_info.raw.is_empty() {
+        ver_info.raw.as_str()
+    } else {
+        "0.1.0"
+    };
     let gui_name = if project_canonical.join("src-tauri/Cargo.toml").is_file() {
         extract_project_name(&project_canonical.join("src-tauri"))
     } else {
@@ -473,8 +478,9 @@ fn build_on_linux(
                     tb_base=$(basename \"$tb\"); \
                     if [[ \"$tb_base\" =~ ^{app_name}- ]] || [[ \"$tb_base\" == \"{app_name}\" ]]; then \
                         cp \"$tb\" '/workspace/dist/{app_name}-test-linux.x86_64'; \
-                        chmod +x '/workspace/dist/{app_name}-test-linux.x86_64' 2>/dev/null || true; \
-                        echo '[dev-forge : Linux] Binario de prueba generado: /workspace/dist/{app_name}-test-linux.x86_64'; \
+                        cp '/workspace/dist/{app_name}-test-linux.x86_64' '/workspace/dist/{app_name}-test-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                        chmod +x '/workspace/dist/{app_name}-test-'* 2>/dev/null || true; \
+                        echo '[dev-forge : Linux] Binario de prueba generado: /workspace/dist/{app_name}-test-linux.x86_64 ({raw_ver})'; \
                         break; \
                     fi; \
                 done; \
@@ -482,8 +488,9 @@ fn build_on_linux(
                     first_test=$(find /tmp/cargo-target/release/deps/ -maxdepth 1 -type f -executable ! -name '*.so' ! -name '*.d' 2>/dev/null | head -n 1); \
                     if [ -n \"$first_test\" ]; then \
                         cp \"$first_test\" '/workspace/dist/{app_name}-test-linux.x86_64'; \
-                        chmod +x '/workspace/dist/{app_name}-test-linux.x86_64' 2>/dev/null || true; \
-                        echo '[dev-forge : Linux] Binario de prueba generado: /workspace/dist/{app_name}-test-linux.x86_64'; \
+                        cp '/workspace/dist/{app_name}-test-linux.x86_64' '/workspace/dist/{app_name}-test-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                        chmod +x '/workspace/dist/{app_name}-test-'* 2>/dev/null || true; \
+                        echo '[dev-forge : Linux] Binario de prueba generado: /workspace/dist/{app_name}-test-linux.x86_64 ({raw_ver})'; \
                     fi; \
                 fi;",
                 clean_cmd
@@ -492,7 +499,8 @@ fn build_on_linux(
                 "{}mkdir -p /workspace/dist && cd /workspace; \
                 echo '=== [dev-forge : Linux] Compilando suite de testing Go para {app_name} ==='; \
                 GOCACHE=/tmp/go-cache go test -c -o '/workspace/dist/{app_name}-test-linux.x86_64' . 2>/dev/null || true; \
-                chmod +x '/workspace/dist/{app_name}-test-linux.x86_64' 2>/dev/null || true;",
+                cp '/workspace/dist/{app_name}-test-linux.x86_64' '/workspace/dist/{app_name}-test-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                chmod +x '/workspace/dist/{app_name}-test-'* 2>/dev/null || true;",
                 clean_cmd
             ),
             ProjectType::Python(_) => format!(
@@ -507,7 +515,9 @@ fn build_on_linux(
             ),
             ProjectType::CCpp => format!(
                 "{}mkdir -p /workspace/dist /tmp/build && cd /workspace && cmake -B /tmp/build -S . -G Ninja -DBUILD_TESTING=ON && cmake --build /tmp/build && \
-                find /tmp/build -maxdepth 2 -type f -executable \\( -name '*test*' -o -name '*_test' \\) -exec cp {{}} '/workspace/dist/{app_name}-test-linux.x86_64' \\; 2>/dev/null || true;",
+                find /tmp/build -maxdepth 2 -type f -executable \\( -name '*test*' -o -name '*_test' \\) -exec cp {{}} '/workspace/dist/{app_name}-test-linux.x86_64' \\; 2>/dev/null || true; \
+                cp '/workspace/dist/{app_name}-test-linux.x86_64' '/workspace/dist/{app_name}-test-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                chmod +x '/workspace/dist/{app_name}-test-'* 2>/dev/null || true;",
                 clean_cmd
             ),
             ProjectType::Java => format!(
@@ -534,7 +544,8 @@ fn build_on_linux(
                         cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release; \
                         if [ -f '/tmp/cargo-target/release/{app_name}' ]; then \
                             cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; \
-                            chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true; \
+                            cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                            chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; \
                         fi; "
                     )
                 } else {
@@ -555,7 +566,8 @@ fn build_on_linux(
                         for gb in '/tmp/cargo-target/release/{gui_name}' '/tmp/cargo-target/release/{app_name}-gui' 'src-tauri/target/release/{gui_name}' 'target/release/{gui_name}'; do \
                             if [ -f \"$gb\" ]; then \
                                 cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; \
-                                chmod +x '/workspace/dist/{app_name}-gui-linux.x86_64' 2>/dev/null || true; \
+                                cp '/workspace/dist/{app_name}-gui-linux.x86_64' '/workspace/dist/{app_name}-gui-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                                chmod +x '/workspace/dist/{app_name}-gui-'* 2>/dev/null || true; \
                                 break; \
                             fi; \
                         done; "
@@ -586,7 +598,8 @@ fn build_on_linux(
                         "{}mkdir -p /workspace/dist && cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release && \
                         if [ -f '/tmp/cargo-target/release/{app_name}' ]; then \
                             cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; \
-                            chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true; \
+                            cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                            chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; \
                         fi",
                         clean_cmd
                     )
@@ -595,13 +608,13 @@ fn build_on_linux(
             ProjectType::Python(details) => {
                 let py_standalone = if use_nuitka {
                     format!(
-                        "if command -v nuitka >/dev/null 2>&1; then nuitka --standalone --onefile --output-dir=/tmp/nuitka-out --product-version={} --assume-yes-for-downloads main.py -o {}-cli-linux.x86_64 && mkdir -p /workspace/dist && cp /tmp/nuitka-out/{}-cli-linux.x86_64 /workspace/dist/; else pyinstaller --clean -F --name {}-cli-linux.x86_64 main.py --distpath /workspace/dist/; fi",
-                        ver_info.wix, app_name, app_name, app_name
+                        "if command -v nuitka >/dev/null 2>&1; then nuitka --standalone --onefile --output-dir=/tmp/nuitka-out --product-version={} --assume-yes-for-downloads main.py -o {}-cli-linux.x86_64 && mkdir -p /workspace/dist && cp /tmp/nuitka-out/{}-cli-linux.x86_64 /workspace/dist/ && cp /workspace/dist/{}-cli-linux.x86_64 /workspace/dist/{}-cli-{}-linux.x86_64; else pyinstaller --clean -F --name {}-cli-linux.x86_64 main.py --distpath /workspace/dist/ && cp /workspace/dist/{}-cli-linux.x86_64 /workspace/dist/{}-cli-{}-linux.x86_64; fi",
+                        ver_info.wix, app_name, app_name, app_name, app_name, raw_ver, app_name, app_name, app_name, raw_ver
                     )
                 } else {
                     format!(
-                        "pyinstaller --clean -F --name {}-cli-linux.x86_64 main.py --distpath /workspace/dist/",
-                        app_name
+                        "pyinstaller --clean -F --name {}-cli-linux.x86_64 main.py --distpath /workspace/dist/ && cp /workspace/dist/{}-cli-linux.x86_64 /workspace/dist/{}-cli-{}-linux.x86_64",
+                        app_name, app_name, app_name, raw_ver
                     )
                 };
                 match details.manager {
@@ -634,7 +647,7 @@ fn build_on_linux(
                 clean_cmd
             ),
             ProjectType::Go => format!(
-                "{}mkdir -p /workspace/dist && cd /workspace && (GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' . 2>/dev/null || GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' ./...) && chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true",
+                "{}mkdir -p /workspace/dist && cd /workspace && (GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' . 2>/dev/null || GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' ./...) && cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true",
                 clean_cmd
             ),
             ProjectType::Node => format!(
@@ -642,7 +655,7 @@ fn build_on_linux(
                 clean_cmd
             ),
             ProjectType::CCpp => format!(
-                "{}rm -rf /tmp/build && mkdir -p /tmp/build /workspace/dist && cd /workspace && cmake -B /tmp/build -S . -G Ninja && cmake --build /tmp/build && find /tmp/build -maxdepth 2 -type f -executable ! -name '*.ninja*' ! -name '*.cmake' -exec cp {{}} '/workspace/dist/{app_name}-cli-linux.x86_64' \\; 2>/dev/null || true",
+                "{}rm -rf /tmp/build && mkdir -p /tmp/build /workspace/dist && cd /workspace && cmake -B /tmp/build -S . -G Ninja && cmake --build /tmp/build && find /tmp/build -maxdepth 2 -type f -executable ! -name '*.ninja*' ! -name '*.cmake' -exec cp {{}} '/workspace/dist/{app_name}-cli-linux.x86_64' \\; 2>/dev/null || true; cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true",
                 clean_cmd
             ),
             ProjectType::Generic => format!(
@@ -664,8 +677,9 @@ fn build_on_linux(
                     tb_base=$(basename \"$tb\"); \
                     if [[ \"$tb_base\" =~ ^{app_name}- ]] || [[ \"$tb_base\" == \"{app_name}\" ]]; then \
                         cp \"$tb\" '/workspace/dist/{app_name}-test-darwin.x86_64'; \
-                        chmod +x '/workspace/dist/{app_name}-test-darwin.x86_64' 2>/dev/null || true; \
-                        echo '[dev-forge : macOS] Binario de prueba generado: /workspace/dist/{app_name}-test-darwin.x86_64'; \
+                        cp '/workspace/dist/{app_name}-test-darwin.x86_64' '/workspace/dist/{app_name}-test-{raw_ver}-darwin.x86_64' 2>/dev/null || true; \
+                        chmod +x '/workspace/dist/{app_name}-test-'* 2>/dev/null || true; \
+                        echo '[dev-forge : macOS] Binario de prueba generado: /workspace/dist/{app_name}-test-darwin.x86_64 ({raw_ver})'; \
                         break; \
                     fi; \
                 done;"
@@ -674,7 +688,8 @@ fn build_on_linux(
                 "mkdir -p /workspace/dist && cd /workspace; \
                 echo '=== [dev-forge : macOS] Compilando suite de testing Go para Darwin ==='; \
                 GOCACHE=/tmp/go-cache GOOS=darwin GOARCH=amd64 go test -c -o '/workspace/dist/{app_name}-test-darwin.x86_64' . 2>/dev/null || true; \
-                chmod +x '/workspace/dist/{app_name}-test-darwin.*' 2>/dev/null || true;"
+                cp '/workspace/dist/{app_name}-test-darwin.x86_64' '/workspace/dist/{app_name}-test-{raw_ver}-darwin.x86_64' 2>/dev/null || true; \
+                chmod +x '/workspace/dist/{app_name}-test-'* 2>/dev/null || true;"
             ),
             _ => "echo '[dev-forge : macOS] Compilación de test para macOS omitida para este proyecto.';".to_string(),
         }
@@ -708,16 +723,18 @@ fn build_on_linux(
                 for f in '/tmp/cargo-target/x86_64-apple-darwin/release/{app_name}' '/workspace/target/x86_64-apple-darwin/release/{app_name}'; do \
                     if [ -f \"$f\" ]; then \
                         cp \"$f\" '/workspace/dist/{app_name}-cli-darwin.x86_64'; \
-                        chmod +x '/workspace/dist/{app_name}-cli-darwin.x86_64' 2>/dev/null || true; \
-                        echo '[dev-forge : macOS] Generado: /workspace/dist/{app_name}-cli-darwin.x86_64'; \
+                        cp '/workspace/dist/{app_name}-cli-darwin.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-darwin.x86_64' 2>/dev/null || true; \
+                        chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; \
+                        echo '[dev-forge : macOS] Generado: /workspace/dist/{app_name}-cli-darwin.x86_64 ({raw_ver})'; \
                         break; \
                     fi; \
                 done; \
                 for f in '/tmp/cargo-target/aarch64-apple-darwin/release/{app_name}' '/workspace/target/aarch64-apple-darwin/release/{app_name}'; do \
                     if [ -f \"$f\" ]; then \
                         cp \"$f\" '/workspace/dist/{app_name}-cli-darwin.aarch64'; \
-                        chmod +x '/workspace/dist/{app_name}-cli-darwin.aarch64' 2>/dev/null || true; \
-                        echo '[dev-forge : macOS] Generado: /workspace/dist/{app_name}-cli-darwin.aarch64'; \
+                        cp '/workspace/dist/{app_name}-cli-darwin.aarch64' '/workspace/dist/{app_name}-cli-{raw_ver}-darwin.aarch64' 2>/dev/null || true; \
+                        chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; \
+                        echo '[dev-forge : macOS] Generado: /workspace/dist/{app_name}-cli-darwin.aarch64 ({raw_ver})'; \
                         break; \
                     fi; \
                 done;"
@@ -726,7 +743,9 @@ fn build_on_linux(
                 "echo '=== [dev-forge : macOS] Compilando binarios Go Darwin para {app_name} ==='; \
                 mkdir -p /workspace/dist && cd /workspace; \
                 GOCACHE=/tmp/go-cache GOOS=darwin GOARCH=amd64 go build -o '/workspace/dist/{app_name}-cli-darwin.x86_64' . 2>/dev/null || true; \
+                cp '/workspace/dist/{app_name}-cli-darwin.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-darwin.x86_64' 2>/dev/null || true; \
                 GOCACHE=/tmp/go-cache GOOS=darwin GOARCH=arm64 go build -o '/workspace/dist/{app_name}-cli-darwin.aarch64' . 2>/dev/null || true; \
+                cp '/workspace/dist/{app_name}-cli-darwin.aarch64' '/workspace/dist/{app_name}-cli-{raw_ver}-darwin.aarch64' 2>/dev/null || true; \
                 chmod +x /workspace/dist/{app_name}-cli-darwin.* 2>/dev/null || true;"
             ),
             _ => "echo '[dev-forge : macOS] Compilación para macOS omitida para este tipo de proyecto.';".to_string(),
@@ -828,6 +847,11 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
 
     let ver_info = extract_project_version(&project_canonical);
     let app_name = extract_project_name(&project_canonical);
+    let raw_ver = if !ver_info.raw.is_empty() {
+        ver_info.raw.as_str()
+    } else {
+        "0.1.0"
+    };
     let gui_name = if project_canonical.join("src-tauri/Cargo.toml").is_file() {
         extract_project_name(&project_canonical.join("src-tauri"))
     } else {
@@ -855,14 +879,16 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
                 if (-not $testBin) {{ $testBin = Get-ChildItem -Path C:\\target\\release\\deps -Filter '*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 }}; \
                 if ($testBin) {{ \
                     Copy-Item $testBin.FullName 'C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe' -Force; \
-                    Write-Host \"[dev-forge : Windows] Binario de prueba generado: C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe\"; \
+                    Copy-Item 'C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-test-{raw_ver}-windows.x86_64.exe' -Force; \
+                    Write-Host \"[dev-forge : Windows] Binario de prueba generado: C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe ({raw_ver})\"; \
                 }}",
                 init_prefix
             ),
             ProjectType::Go => format!(
                 "{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
                 Write-Host '=== [dev-forge : Windows] Compilando suite de testing Go para {app_name} ==='; \
-                go test -c -o 'C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe' . ",
+                go test -c -o 'C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe' . ; \
+                Copy-Item 'C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-test-{raw_ver}-windows.x86_64.exe' -Force",
                 init_prefix
             ),
             ProjectType::Python(_) => format!(
@@ -887,7 +913,10 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
                 let cli_part = if build_cli {
                     format!(
                         "cargo build --release; \
-                        if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}; "
+                        if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ \
+                            Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; \
+                            Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; \
+                        }}; "
                     )
                 } else {
                     "".to_string()
@@ -901,6 +930,7 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
                         if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} \
                         elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} \
                         elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }}; \
+                        if (Test-Path 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe') {{ Copy-Item 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-gui-{raw_ver}-windows.x86_64.exe' -Force }}; \
                         if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}; "
                     )
                 } else {
@@ -923,21 +953,23 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
                     format!(
                         "{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; \
                         if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
-                        if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}",
+                        if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ \
+                            Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; \
+                            Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; \
+                        }}",
                         init_prefix
                     )
                 }
             }
             ProjectType::Python(_) => {
+                let wix_ver = &ver_info.wix;
                 let py_compile = if use_nuitka {
                     format!(
-                        "if (Test-Path main.py) {{ $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) {{ \"--windows-icon-from-ico='$ico'\" }} else {{ '' }}; Invoke-Expression \"nuitka --standalone --onefile --output-dir=C:\\target\\nuitka-out $icoOpt --product-version='{}' --file-version='{}' --assume-yes-for-downloads main.py -o {}-cli-windows.x86_64.exe 2>&1\" | Out-Host; if (Test-Path C:\\target\\nuitka-out\\{}-cli-windows.x86_64.exe) {{ Copy-Item C:\\target\\nuitka-out\\{}-cli-windows.x86_64.exe C:\\workspace\\dist\\ -Force; exit 0 }} else {{ Invoke-Expression \"python -m PyInstaller --clean -F --name {}-cli-windows.x86_64 main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\{}-cli-windows.x86_64.exe) {{ exit 0 }} else {{ exit 1 }} }} }} else {{ python -m build -o C:\\workspace\\dist }}",
-                        ver_info.wix, ver_info.wix, app_name, app_name, app_name, app_name, app_name
+                        "if (Test-Path main.py) {{ $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) {{ \"--windows-icon-from-ico='$ico'\" }} else {{ '' }}; Invoke-Expression \"nuitka --standalone --onefile --output-dir=C:\\target\\nuitka-out $icoOpt --product-version='{wix_ver}' --file-version='{wix_ver}' --assume-yes-for-downloads main.py -o {app_name}-cli-windows.x86_64.exe 2>&1\" | Out-Host; if (Test-Path C:\\target\\nuitka-out\\{app_name}-cli-windows.x86_64.exe) {{ Copy-Item C:\\target\\nuitka-out\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\ -Force; Copy-Item C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe -Force; exit 0 }} else {{ Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ Copy-Item C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe -Force; exit 0 }} else {{ exit 1 }} }} }} else {{ python -m build -o C:\\workspace\\dist }}"
                     )
                 } else {
                     format!(
-                        "if (Test-Path main.py) {{ $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; Invoke-Expression \"python -m PyInstaller --clean -F --name {}-cli-windows.x86_64 $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\{}-cli-windows.x86_64.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}",
-                        app_name, app_name
+                        "if (Test-Path main.py) {{ $ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; $icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ Copy-Item C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe -Force; exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
                     )
                 };
                 format!(
@@ -948,13 +980,15 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
             ProjectType::CCpp => format!(
                 "{}{}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; \
                 if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
-                Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Where-Object {{ $_.Name -notmatch '(?i)(ninja|compiler)' }} | Select-Object -First 1 | Copy-Item -Destination 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force",
+                Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Where-Object {{ $_.Name -notmatch '(?i)(ninja|compiler)' }} | Select-Object -First 1 | Copy-Item -Destination 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; \
+                if (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe') {{ Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force }}",
                 init_prefix, vs_shell_init
             ),
             ProjectType::Go => format!(
                 "{}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
                 go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' . ; \
-                if (-not (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe')) {{ go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' ./... }}",
+                if (-not (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe')) {{ go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' ./... }}; \
+                if (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe') {{ Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force }}",
                 init_prefix
             ),
             _ => format!(

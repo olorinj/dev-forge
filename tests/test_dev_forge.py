@@ -165,5 +165,30 @@ class TestDevForge(unittest.TestCase):
         self.assertEqual(args.profile, "test")
 
 
+    def test_versioned_binary_naming_convention(self):
+        from dev_forge.detector import extract_project_version, extract_project_name
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "Cargo.toml").write_text('[package]\nname = "lexishield"\nversion = "2.0.1"', encoding="utf-8")
+            ver = extract_project_version(p)
+            app = extract_project_name(p)
+            raw = ver.raw
+            
+            # Canonical and versioned format assertions
+            canonical_cli = f"{app}-cli-linux.x86_64"
+            versioned_cli = f"{app}-cli-{raw}-linux.x86_64"
+            canonical_gui = f"{app}-gui-linux.x86_64"
+            versioned_gui = f"{app}-gui-{raw}-linux.x86_64"
+            canonical_win_gui = f"{app}-gui-windows.x86_64.exe"
+            versioned_win_gui = f"{app}-gui-{raw}-windows.x86_64.exe"
+
+            self.assertEqual(canonical_cli, "lexishield-cli-linux.x86_64")
+            self.assertEqual(versioned_cli, "lexishield-cli-2.0.1-linux.x86_64")
+            self.assertEqual(canonical_gui, "lexishield-gui-linux.x86_64")
+            self.assertEqual(versioned_gui, "lexishield-gui-2.0.1-linux.x86_64")
+            self.assertEqual(canonical_win_gui, "lexishield-gui-windows.x86_64.exe")
+            self.assertEqual(versioned_win_gui, "lexishield-gui-2.0.1-windows.x86_64.exe")
+
+
 if __name__ == "__main__":
     unittest.main()
