@@ -136,6 +136,8 @@ Vagrant.configure("2") do |config|
     win.vm.hostname = "forge-windows"
     win.vm.boot_timeout = 1800
     win.vm.communicator = "winrm"
+    win.winrm.username = "vagrant"
+    win.winrm.password = "vagrant"
     win.winrm.retry_limit = 60
     win.winrm.retry_delay = 10
     # Carpeta del proyecto dev-forge y caché de compiladores
@@ -163,6 +165,8 @@ Vagrant.configure("2") do |config|
       ansible.playbook = "provision/ansible/windows.yml"
       ansible.compatibility_mode = "2.0"
       ansible.extra_vars = {
+        ansible_winrm_scheme: "http",
+        ansible_winrm_server_cert_validation: "ignore",
         host_language_tag: win_lang_tag
       }
     end

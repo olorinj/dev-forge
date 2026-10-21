@@ -91,15 +91,35 @@ pub enum Commands {
     },
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct BuildArgs {
     /// Path to the client project to compile (mandatory)
     #[arg(short, long)]
     pub project: PathBuf,
 
-    /// Target destination platform
-    #[arg(short, long, default_value = "all")]
-    pub target: TargetPlatform,
+    /// Target destination platform (linux | windows | macos | all)
+    #[arg(short, long)]
+    pub target: Option<TargetPlatform>,
+
+    /// Component to build (all | cli | gui | test)
+    #[arg(long, value_enum)]
+    pub component: Option<BuildComponent>,
+
+    /// Packaging format (all | bin | bundle)
+    #[arg(long, value_enum)]
+    pub package: Option<BuildPackage>,
+
+    /// Build profile (release | test | debug)
+    #[arg(long, value_enum)]
+    pub profile: Option<BuildProfile>,
+
+    /// Build only testing executables / test runners
+    #[arg(long)]
+    pub test: bool,
+
+    /// Force interactive terminal selection menu
+    #[arg(short, long)]
+    pub interactive: bool,
 
     /// Clean intermediate caches before compilation
     #[arg(short, long)]
@@ -120,6 +140,59 @@ pub struct BuildArgs {
     /// Convenience flag to force PyInstaller for Python builds
     #[arg(long)]
     pub pyinstaller: bool,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BuildComponent {
+    All,
+    Cli,
+    Gui,
+    Test,
+}
+
+impl std::fmt::Display for BuildComponent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::All => write!(f, "all"),
+            Self::Cli => write!(f, "cli"),
+            Self::Gui => write!(f, "gui"),
+            Self::Test => write!(f, "test"),
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BuildPackage {
+    All,
+    Bin,
+    Bundle,
+}
+
+impl std::fmt::Display for BuildPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::All => write!(f, "all"),
+            Self::Bin => write!(f, "bin"),
+            Self::Bundle => write!(f, "bundle"),
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BuildProfile {
+    Release,
+    Debug,
+    Test,
+}
+
+impl std::fmt::Display for BuildProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Release => write!(f, "release"),
+            Self::Debug => write!(f, "debug"),
+            Self::Test => write!(f, "test"),
+        }
+    }
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -193,5 +266,66 @@ impl std::fmt::Display for TargetPlatform {
             Self::Macos => write!(f, "macos"),
             Self::All => write!(f, "all"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_build_interactive_trigger() {
+        let cli = Cli::try_parse_from(["dev-forge", "build", "-p", "/tmp/proj"]).unwrap();
+        if let Commands::Build(args) = cli.command {
+            assert!(args.target.is_none());
+            assert!(args.component.is_none());
+            assert!(args.package.is_none());
+            assert!(!args.test);
+            assert!(!args.interactive);
+        } else {
+            panic!("Expected Commands::Build");
+        }
+    }
+
+    #[test]
+    fn test_parse_build_flags() {
+        let cli = Cli::try_parse_from([
+            "dev-forge",
+            "build",
+            "-p",
+            "/tmp/proj",
+            "-t",
+            "linux",
+            "--component",
+            "test",
+            "--package",
+            "bin",
+            "--test",
+        ])
+        .unwrap();
+
+        if let Commands::Build(args) = cli.command {
+            assert_eq!(args.target, Some(TargetPlatform::Linux));
+            assert_eq!(args.component, Some(BuildComponent::Test));
+            assert_eq!(args.package, Some(BuildPackage::Bin));
+            assert!(args.test);
+        } else {
+            panic!("Expected Commands::Build");
+        }
+    }
+
+    #[test]
+    fn test_enum_displays() {
+        assert_eq!(BuildComponent::All.to_string(), "all");
+        assert_eq!(BuildComponent::Cli.to_string(), "cli");
+        assert_eq!(BuildComponent::Gui.to_string(), "gui");
+        assert_eq!(BuildComponent::Test.to_string(), "test");
+
+        assert_eq!(BuildPackage::All.to_string(), "all");
+        assert_eq!(BuildPackage::Bin.to_string(), "bin");
+        assert_eq!(BuildPackage::Bundle.to_string(), "bundle");
+
+        assert_eq!(BuildProfile::Release.to_string(), "release");
+        assert_eq!(BuildProfile::Test.to_string(), "test");
     }
 }

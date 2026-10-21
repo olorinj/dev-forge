@@ -33,10 +33,71 @@
         reload: true
       loop:
         - { name: "vm.swappiness", value: "10" }
+        - { name: "vm.vfs_cache_pressure", value: "50" }
         - { name: "vm.dirty_ratio", value: "15" }
         - { name: "vm.dirty_background_ratio", value: "5" }
+        - { name: "kernel.pid_max", value: "4194304" }
+        - { name: "kernel.threads-max", value: "65536" }
         - { name: "fs.file-max", value: "2097152" }
+        - { name: "fs.nr_open", value: "2097152" }
         - { name: "fs.inotify.max_user_watches", value: "524288" }
+
+    - name: Comprobar existencia de /swapfile
+      ansible.builtin.stat:
+        path: /swapfile
+      register: stat_swapfile
+
+    - name: Crear y activar swapfile de 4GB si no hay swap suficiente (< 3000MB)
+      when: ansible_memory_mb.swap.total < 3000 and not stat_swapfile.stat.exists
+      block:
+        - name: Crear archivo swapfile de 4GB
+          ansible.builtin.command: fallocate -l 4G /swapfile
+        - name: Ajustar permisos de swapfile
+          ansible.builtin.file:
+            path: /swapfile
+            mode: '0600'
+        - name: Formatear swapfile
+          ansible.builtin.command: mkswap /swapfile
+        - name: Activar swapfile
+          ansible.builtin.command: /sbin/swapon /swapfile
+        - name: Añadir swapfile persistente en fstab
+          ansible.builtin.lineinfile:
+            path: /etc/fstab
+            line: '/swapfile none swap sw 0 0'
+            state: present
+
+    - name: Crear directorios de compilación y caché persistente
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: '0775'
+      loop:
+        - /var/cache/ccache
+        - /var/cache/sccache
+        - /tmp/cargo-target
+        - /opt/go
+        - /tmp/go-cache
+
+    - name: Configurar variables de entorno globales de compilación (/etc/profile.d/build-env.sh)
+      ansible.builtin.copy:
+        dest: /etc/profile.d/build-env.sh
+        mode: '0755'
+        content: |
+          export TMPDIR=/tmp
+          export CARGO_TARGET_DIR=/tmp/cargo-target
+          export CARGO_BUILD_JOBS=2
+          export CCACHE_DIR=/var/cache/ccache
+          export SCCACHE_DIR=/var/cache/sccache
+          if command -v sccache >/dev/null 2>&1; then
+            export RUSTC_WRAPPER=sccache
+          fi
+          export GOPATH=/opt/go
+          export GOCACHE=/tmp/go-cache
+          export MAVEN_OPTS="-Xmx3584m -XX:+UseG1GC -Dfile.encoding=UTF-8"
+          export GRADLE_OPTS="-Xmx3584m -Dorg.gradle.jvmargs=\"-Xmx3584m -XX:+UseG1GC\" -Dorg.gradle.parallel=true"
+          export GIT_OPTIONAL_LOCKS=0
 
     - name: Asegurar que /tmp utiliza almacenamiento en disco y no tmpfs limitado a 2GB
       ansible.builtin.lineinfile:
@@ -264,3 +325,4 @@
         rm -rf /tmp/apple-codesign*
       args:
         creates: /usr/local/bin/rcodesign
+

@@ -118,6 +118,52 @@ class TestDevForge(unittest.TestCase):
             (p / "package.json").write_text('{"name": "@org/web-app"}', encoding="utf-8")
             self.assertEqual(extract_project_name(p), "web-app")
 
+    def test_menu_prompt_defaults(self):
+        from unittest.mock import patch
+        from dev_forge.menu import prompt_menu
+
+        class DummyArgs:
+            def __init__(self):
+                self.project = Path("/dummy/proj")
+                self.component = None
+                self.target = None
+                self.package = None
+                self.profile = None
+                self.test = False
+
+        args = DummyArgs()
+        with patch("builtins.input", return_value=""):
+            prompt_menu(args)
+
+        self.assertEqual(args.component, "all")
+        self.assertEqual(args.target, "all")
+        self.assertEqual(args.package, "all")
+        self.assertEqual(args.profile, "release")
+
+    def test_menu_prompt_test_selection(self):
+        from unittest.mock import patch
+        from dev_forge.menu import prompt_menu
+
+        class DummyArgs:
+            def __init__(self):
+                self.project = Path("/dummy/proj")
+                self.component = None
+                self.target = None
+                self.package = None
+                self.profile = None
+                self.test = False
+
+        args = DummyArgs()
+        # Option 4 for component (test), 2 for Linux, 2 for bin, 2 for test profile
+        with patch("builtins.input", side_effect=["4", "2", "2", "2"]):
+            prompt_menu(args)
+
+        self.assertEqual(args.component, "test")
+        self.assertTrue(args.test)
+        self.assertEqual(args.target, "linux")
+        self.assertEqual(args.package, "bin")
+        self.assertEqual(args.profile, "test")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,7 @@ mod doctor;
 mod hardware;
 mod ide;
 mod keyboard;
+mod menu;
 mod project;
 mod terminal;
 mod vagrant;
@@ -107,8 +108,8 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         Commands::Ssh { machine, command } => {
             vagrant::cmd_ssh(&machine, command.as_deref())?;
         }
-        Commands::Build(build_args) => {
-            vagrant::cmd_build(&build_args)?;
+        Commands::Build(mut build_args) => {
+            vagrant::cmd_build(&mut build_args)?;
         }
         Commands::TestVm { machine } => {
             vagrant::cmd_test_vm(&machine)?;

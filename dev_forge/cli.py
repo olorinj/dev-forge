@@ -81,9 +81,38 @@ def create_parser() -> argparse.ArgumentParser:
     build_parser.add_argument(
         "-t",
         "--target",
-        default="all",
+        default=None,
         choices=["linux", "windows", "macos", "all"],
-        help="Target destination platform",
+        help="Target destination platform (linux | windows | macos | all)",
+    )
+    build_parser.add_argument(
+        "--component",
+        default=None,
+        choices=["all", "cli", "gui", "test"],
+        help="Component to build (all | cli | gui | test)",
+    )
+    build_parser.add_argument(
+        "--package",
+        default=None,
+        choices=["all", "bin", "bundle"],
+        help="Packaging format (all | bin | bundle)",
+    )
+    build_parser.add_argument(
+        "--profile",
+        default=None,
+        choices=["release", "debug", "test"],
+        help="Build profile (release | debug | test)",
+    )
+    build_parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Build only testing executables / test runners",
+    )
+    build_parser.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        help="Force interactive terminal selection menu",
     )
     build_parser.add_argument(
         "-c",
@@ -192,6 +221,11 @@ def main(argv=None) -> None:
             args.update,
             compiler=args.compiler,
             pyinstaller=args.pyinstaller,
+            component=args.component,
+            package=args.package,
+            profile=args.profile,
+            test=args.test,
+            interactive=args.interactive,
         )
     elif args.subcommand == "ide":
         from dev_forge.ide import cmd_ide

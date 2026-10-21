@@ -93,7 +93,15 @@
     # -------------------------------------------------------------------------
     # 4. INSTALACIÓN DE CHOCOLATEY Y PAQUETES BASE
     # -------------------------------------------------------------------------
-    - name: Instalar paquetes esenciales y herramientas de compilación con Chocolatey
+    - name: Asegurar instalación de Chocolatey
+      ansible.windows.win_powershell:
+        script: |
+          if (-not (Get-Command choco.exe -ErrorAction SilentlyContinue)) {
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          }
+
+    - name: Instalar paquetes esenciales y herramientas con Chocolatey
       chocolatey.chocolatey.win_chocolatey:
         name:
           - git
@@ -104,8 +112,28 @@
           - ninja
           - wixtoolset
           - innosetup
-          - visualstudio2022buildtools
         state: present
+
+    - name: Instalar Visual Studio 2022 C++ Build Tools (MSVC y Windows SDK) con Chocolatey
+      chocolatey.chocolatey.win_chocolatey:
+        name: visualstudio2022buildtools
+        package_params: "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart"
+        state: present
+
+    - name: Asegurar WiX Toolset e Inno Setup en el PATH del sistema
+      ansible.windows.win_powershell:
+        script: |
+          $wixDir = Get-ChildItem "C:\Program Files (x86)" -Filter "WiX Toolset*" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $wixBin = if ($wixDir) { Join-Path $wixDir.FullName "bin" } else { "C:\Program Files (x86)\WiX Toolset v3.14\bin" }
+          $innoBin = "C:\Program Files (x86)\Inno Setup 6"
+          $currPath = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+          $toAdd = @($wixBin, $innoBin)
+          foreach ($p in $toAdd) {
+            if ((Test-Path $p) -and ($currPath -notlike "*$p*")) {
+              $currPath = "$p;$currPath"
+            }
+          }
+          [System.Environment]::SetEnvironmentVariable('Path', $currPath, 'Machine')
 
     # -------------------------------------------------------------------------
     # 5. TOOLCHAIN DE RUST (MSVC) Y TAURI CLI
@@ -170,11 +198,29 @@
     # -------------------------------------------------------------------------
     # 7. TOOLCHAINS DE GO, NODE.JS Y JAVA
     # -------------------------------------------------------------------------
-    - name: Instalar Go, Node.js LTS, OpenJDK 21 y Gradle
+    - name: Instalar Go, Node.js LTS y Gradle con Chocolatey
       chocolatey.chocolatey.win_chocolatey:
         name:
           - golang
           - nodejs-lts
-          - openjdk21
           - gradle
         state: present
+
+    - name: Instalar Eclipse Temurin OpenJDK 21 LTS y registrar en PATH
+      ansible.windows.win_powershell:
+        script: |
+          if (-not (Get-Command java.exe -ErrorAction SilentlyContinue)) {
+            $msi = "$env:TEMP\temurin21.msi"
+            & curl.exe -sSfL "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.msi" -o $msi
+            Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart ADDLOCAL=FeatureMain,FeatureEnvironment,FeatureJarFileRunWith,FeatureJavaHome" -Wait
+            Remove-Item -Force $msi -ErrorAction SilentlyContinue
+          }
+          $javaExe = Get-ChildItem "C:\Program Files\Eclipse Adoptium" -Recurse -Filter "java.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($javaExe) {
+            $jdkBin = $javaExe.DirectoryName
+            $currPath = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+            if ($currPath -notlike "*$jdkBin*") {
+              [System.Environment]::SetEnvironmentVariable('Path', "$jdkBin;$currPath", 'Machine')
+            }
+          }
+

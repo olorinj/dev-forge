@@ -37,7 +37,7 @@ check "pid_max >= 4194304" "[ $(sysctl -n kernel.pid_max) -ge 4194304 ]"
 
 echo ""
 echo "3. Verificando Almacenamiento y Caches..."
-check "tmpfs montado en /tmp" "mountpoint -q /tmp"
+check "/tmp en disco raíz (sin limitación tmpfs)" "! mountpoint -q /tmp"
 check "Swap configurado" "[ $(free -m | awk '/Swap:/ {print $2}') -gt 1000 ]"
 check "Directorio ccache accesible" "[ -d /var/cache/ccache ]"
 check "Directorio sccache accesible" "[ -d /var/cache/sccache ]"

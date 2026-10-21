@@ -163,15 +163,21 @@ def cmd_test_vm(machine: str) -> None:
 
 def cmd_build(
     project_path: Path,
-    target: str,
+    target: str | None = None,
     clean: bool = False,
     keep_vm: bool = False,
     update: bool = False,
     compiler: str = "nuitka",
     pyinstaller: bool = False,
+    component: str | None = None,
+    package: str | None = None,
+    profile: str | None = None,
+    test: bool = False,
+    interactive: bool = False,
 ) -> None:
     """Compile a project inside the isolated VM environment."""
     from dev_forge.config import load_host_profile
+    from dev_forge.menu import prompt_menu
 
     load_host_profile()
 
@@ -180,20 +186,46 @@ def cmd_build(
         sys.exit(1)
 
     project_canonical = project_path.resolve()
+
+    class BuildOptions:
+        def __init__(self):
+            self.project = project_canonical
+            self.target = target
+            self.component = component
+            self.package = package
+            self.profile = profile
+            self.test = test
+
+    opts = BuildOptions()
+    is_interactive = interactive or (
+        target is None and component is None and package is None and not test
+    )
+    if is_interactive:
+        prompt_menu(opts)
+
+    target_res = opts.target or "all"
+    component_res = opts.component or ("test" if opts.test else "all")
+    package_res = opts.package or "all"
+    profile_res = opts.profile or ("test" if opts.test or component_res == "test" else "release")
+    is_test_mode = opts.test or component_res == "test" or profile_res == "test"
+
     dist_dir = project_canonical / "dist"
     dist_dir.mkdir(parents=True, exist_ok=True)
 
     ptype = detect_project_type(project_canonical)
     ver_info = extract_project_version(project_canonical)
 
-    log_info(f"Proyecto a compilar: {project_canonical}")
-    log_info(f"Tipo de proyecto detectado: {ptype}")
-    log_info(f"Versión detectada: {ver_info.display} (WiX: {ver_info.wix})")
-    log_info(f"Destino solicitado: {target}")
+    log_info(f"Proyecto a compilar:  {project_canonical}")
+    log_info(f"Tipo detectado:       {ptype}")
+    log_info(f"Versión detectada:    {ver_info.display} (WiX: {ver_info.wix})")
+    log_info(f"Destino solicitado:   {target_res}")
+    log_info(f"Componente / Tipo:    {component_res}")
+    log_info(f"Formato / Empaque:    {package_res}")
+    log_info(f"Modo / Perfil:        {profile_res}")
 
     envs = {"FORGE_WORKSPACE": str(project_canonical)}
 
-    if target == "linux":
+    if target_res == "linux":
         build_on_linux(
             ptype,
             project_canonical,
@@ -206,8 +238,11 @@ def cmd_build(
             ver_info=ver_info,
             build_linux=True,
             build_macos=False,
+            component=component_res,
+            package=package_res,
+            is_test_mode=is_test_mode,
         )
-    elif target == "macos":
+    elif target_res == "macos":
         build_on_linux(
             ptype,
             project_canonical,
@@ -220,8 +255,11 @@ def cmd_build(
             ver_info=ver_info,
             build_linux=False,
             build_macos=True,
+            component=component_res,
+            package=package_res,
+            is_test_mode=is_test_mode,
         )
-    elif target == "windows":
+    elif target_res == "windows":
         build_on_windows(
             ptype,
             project_canonical,
@@ -232,8 +270,11 @@ def cmd_build(
             compiler=compiler,
             pyinstaller=pyinstaller,
             ver_info=ver_info,
+            component=component_res,
+            package=package_res,
+            is_test_mode=is_test_mode,
         )
-    elif target == "all":
+    elif target_res == "all":
         build_on_linux(
             ptype,
             project_canonical,
@@ -246,6 +287,9 @@ def cmd_build(
             ver_info=ver_info,
             build_linux=True,
             build_macos=True,
+            component=component_res,
+            package=package_res,
+            is_test_mode=is_test_mode,
         )
         build_on_windows(
             ptype,
@@ -257,9 +301,12 @@ def cmd_build(
             compiler=compiler,
             pyinstaller=pyinstaller,
             ver_info=ver_info,
+            component=component_res,
+            package=package_res,
+            is_test_mode=is_test_mode,
         )
     else:
-        log_err(f"Destino no soportado: {target}")
+        log_err(f"Destino no soportado: {target_res}")
         sys.exit(1)
 
     dist_count = len(list(dist_dir.iterdir())) if dist_dir.exists() else 0
@@ -282,6 +329,9 @@ def build_on_linux(
     ver_info=None,
     build_linux: bool = True,
     build_macos: bool = False,
+    component: str = "all",
+    package: str = "all",
+    is_test_mode: bool = False,
 ) -> None:
     """Execute isolated build pass on forge-linux."""
     ensure_mutual_exclusion("forge-linux")
@@ -350,86 +400,185 @@ def build_on_linux(
     use_nuitka = not pyinstaller and compiler == "nuitka"
     wix_ver = ver_info.wix if ver_info else "1.0.0"
 
-    if ptype.kind == ProjectTypeKind.RUST_TAURI:
-        linux_script = (
-            f"{clean_cmd}"
-            f"export APPIMAGE_EXTRACT_AND_RUN=1; export NO_STRIP=1; "
-            f"mkdir -p /workspace/dist; "
-            f"echo '=== [dev-forge : Linux] Compilando CLI {app_name} ==='; "
-            f"cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release; "
-            f"if [ -f '/tmp/cargo-target/release/{app_name}' ]; then "
-            f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
-            f"  chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true; "
-            f"fi; "
-            f"echo '=== [dev-forge : Linux] Compilando GUI {gui_name} y Bundles ==='; "
-            f"if ! command -v cargo-tauri >/dev/null 2>&1; then "
-            f"  if command -v cargo-binstall >/dev/null 2>&1; then "
-            f"    cargo-binstall --no-confirm tauri-cli 2>/dev/null || true; "
-            f"  elif command -v npm >/dev/null 2>&1; then "
-            f"    sudo npm install -g @tauri-apps/cli 2>/dev/null || true; "
-            f"  fi; "
-            f"fi; "
-            f"cd /workspace && (if command -v cargo-tauri >/dev/null 2>&1; then cargo tauri build; else npx --yes @tauri-apps/cli build; fi); "
-            f"for gb in '/tmp/cargo-target/release/{gui_name}' '/tmp/cargo-target/release/{app_name}-gui' 'src-tauri/target/release/{gui_name}' 'target/release/{gui_name}'; do "
-            f"  if [ -f \"$gb\" ]; then "
-            f"    cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; "
-            f"    chmod +x '/workspace/dist/{app_name}-gui-linux.x86_64' 2>/dev/null || true; "
-            f"    break; "
-            f"  fi; "
-            f"done; "
-            f"find /tmp/cargo-target/release/bundle/ src-tauri/target/release/bundle/ target/release/bundle/ -type f \\( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \\) -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true"
-        )
-    elif ptype.kind == ProjectTypeKind.RUST:
-        linux_script = (
-            f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release && "
-            f"if [ -f '/tmp/cargo-target/release/{app_name}' ]; then "
-            f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
-            f"  chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true; "
-            f"fi"
-        )
-    elif ptype.kind == ProjectTypeKind.PYTHON:
-        if (project_path / "main.py").is_file():
-            if use_nuitka:
-                py_standalone = (
-                    f"if command -v nuitka >/dev/null 2>&1; then "
-                    f"nuitka --standalone --onefile --output-dir=/tmp/nuitka-out --product-version={wix_ver} "
-                    f"--assume-yes-for-downloads main.py -o {app_name}-cli-linux.x86_64 && mkdir -p /workspace/dist && "
-                    f"cp /tmp/nuitka-out/{app_name}-cli-linux.x86_64 /workspace/dist/; else "
-                    f"pyinstaller --clean -F --name {app_name}-cli-linux.x86_64 main.py --distpath /workspace/dist/; fi"
-                )
-            else:
-                py_standalone = f"pyinstaller --clean -F --name {app_name}-cli-linux.x86_64 main.py --distpath /workspace/dist/"
-            linux_script = f"{clean_cmd}cd /workspace && {py_standalone}"
+    if is_test_mode:
+        if ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
+            linux_script = (
+                f"{clean_cmd}mkdir -p /workspace/dist; "
+                f"echo '=== [dev-forge : Linux] Compilando suite de testing para {app_name} ==='; "
+                f"cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo test --no-run --release; "
+                f"for tb in $(find /tmp/cargo-target/release/deps/ -maxdepth 1 -type f -executable ! -name '*.so' ! -name '*.d' 2>/dev/null); do "
+                f"  tb_base=$(basename \"$tb\"); "
+                f"  if [[ \"$tb_base\" =~ ^{app_name}- ]] || [[ \"$tb_base\" == \"{app_name}\" ]]; then "
+                f"    cp \"$tb\" '/workspace/dist/{app_name}-test-linux.x86_64'; "
+                f"    chmod +x '/workspace/dist/{app_name}-test-linux.x86_64' 2>/dev/null || true; "
+                f"    echo '[dev-forge : Linux] Binario de prueba generado: /workspace/dist/{app_name}-test-linux.x86_64'; "
+                f"    break; "
+                f"  fi; "
+                f"done; "
+                f"if [ ! -f '/workspace/dist/{app_name}-test-linux.x86_64' ]; then "
+                f"  first_test=$(find /tmp/cargo-target/release/deps/ -maxdepth 1 -type f -executable ! -name '*.so' ! -name '*.d' 2>/dev/null | head -n 1); "
+                f"  if [ -n \"$first_test\" ]; then "
+                f"    cp \"$first_test\" '/workspace/dist/{app_name}-test-linux.x86_64'; "
+                f"    chmod +x '/workspace/dist/{app_name}-test-linux.x86_64' 2>/dev/null || true; "
+                f"    echo '[dev-forge : Linux] Binario de prueba generado: /workspace/dist/{app_name}-test-linux.x86_64'; "
+                f"  fi; "
+                f"fi;"
+            )
+        elif ptype.kind == ProjectTypeKind.GO:
+            linux_script = (
+                f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace; "
+                f"echo '=== [dev-forge : Linux] Compilando suite de testing Go para {app_name} ==='; "
+                f"GOCACHE=/tmp/go-cache go test -c -o '/workspace/dist/{app_name}-test-linux.x86_64' . 2>/dev/null || true; "
+                f"chmod +x '/workspace/dist/{app_name}-test-linux.x86_64' 2>/dev/null || true;"
+            )
+        elif ptype.kind == ProjectTypeKind.PYTHON:
+            linux_script = (
+                f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace; "
+                f"echo '=== [dev-forge : Linux] Verificando tests Python ==='; "
+                f"if command -v pytest >/dev/null 2>&1; then "
+                f"  pytest -q 2>&1 | tee /workspace/dist/test-results-linux.log || true; "
+                f"else "
+                f"  python3 -m unittest discover tests 2>&1 | tee /workspace/dist/test-results-linux.log || true; "
+                f"fi;"
+            )
+        elif ptype.kind == ProjectTypeKind.CCPP:
+            linux_script = (
+                f"{clean_cmd}mkdir -p /workspace/dist /tmp/build && cd /workspace && cmake -B /tmp/build -S . -G Ninja -DBUILD_TESTING=ON && cmake --build /tmp/build && "
+                f"find /tmp/build -maxdepth 2 -type f -executable \\( -name '*test*' -o -name '*_test' \\) -exec cp {{}} '/workspace/dist/{app_name}-test-linux.x86_64' \\; 2>/dev/null || true;"
+            )
+        elif ptype.kind == ProjectTypeKind.JAVA:
+            linux_script = (
+                f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace; "
+                f"echo '=== [dev-forge : Linux] Compilando tests Java ==='; "
+                f"(gradle testClasses || ./gradlew testClasses || mvn test-compile || true);"
+            )
         else:
-            linux_script = f"{clean_cmd}cd /workspace && python3 -m build -o /workspace/dist/ 2>/dev/null || python3 -m pip wheel . -w /workspace/dist/"
-    elif ptype.kind == ProjectTypeKind.JAVA:
-        linux_script = (
-            f"{clean_cmd}cd /workspace && chmod +x ./gradlew 2>/dev/null || true; "
-            f"(if [ -f ./gradlew ]; then ./gradlew build; elif [ -f pom.xml ]; then mvn package; else gradle build; fi) && "
-            f"find build/libs/ target/ -name '*.jar' ! -name '*-plain.jar' -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true"
-        )
-    elif ptype.kind == ProjectTypeKind.GO:
-        linux_script = (
-            f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace && (GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' . 2>/dev/null || "
-            f"GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' ./...) && chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true"
-        )
-    elif ptype.kind == ProjectTypeKind.NODE:
-        linux_script = (
-            f"{clean_cmd}cd /workspace && (npm run build || yarn build || pnpm build) && "
-            f"cp -r dist/* build/* /workspace/dist/ 2>/dev/null || true"
-        )
-    elif ptype.kind == ProjectTypeKind.CCPP:
-        linux_script = (
-            f"{clean_cmd}rm -rf /tmp/build && mkdir -p /tmp/build /workspace/dist && cd /workspace && cmake -B /tmp/build -S . -G Ninja && "
-            f"cmake --build /tmp/build && find /tmp/build -maxdepth 2 -type f -executable ! -name '*.ninja*' ! -name '*.cmake' "
-            f"-exec cp {{}} '/workspace/dist/{app_name}-cli-linux.x86_64' \\; 2>/dev/null || true"
-        )
+            linux_script = f"{clean_cmd}echo '[dev-forge : Linux] Testing no configurado para este tipo de proyecto.';"
     else:
-        linux_script = (
-            f"{clean_cmd}cd /workspace && if [ -f ./build.sh ]; then bash ./build.sh; elif [ -f ./Makefile ]; then make; fi"
-        )
+        build_cli = component in ("all", "cli")
+        build_gui = component in ("all", "gui")
+        copy_bundles = package in ("all", "bundle")
 
-    if ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
+        if ptype.kind == ProjectTypeKind.RUST_TAURI:
+            cli_step = (
+                f"echo '=== [dev-forge : Linux] Compilando CLI {app_name} ==='; "
+                f"cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release; "
+                f"if [ -f '/tmp/cargo-target/release/{app_name}' ]; then "
+                f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
+                f"  chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true; "
+                f"fi; "
+                if build_cli
+                else ""
+            )
+            gui_step = (
+                f"echo '=== [dev-forge : Linux] Compilando GUI {gui_name} y Bundles ==='; "
+                f"if ! command -v cargo-tauri >/dev/null 2>&1; then "
+                f"  if command -v cargo-binstall >/dev/null 2>&1; then "
+                f"    cargo-binstall --no-confirm tauri-cli 2>/dev/null || true; "
+                f"  elif command -v npm >/dev/null 2>&1; then "
+                f"    sudo npm install -g @tauri-apps/cli 2>/dev/null || true; "
+                f"  fi; "
+                f"fi; "
+                f"cd /workspace && (if command -v cargo-tauri >/dev/null 2>&1; then cargo tauri build; else npx --yes @tauri-apps/cli build; fi); "
+                f"for gb in '/tmp/cargo-target/release/{gui_name}' '/tmp/cargo-target/release/{app_name}-gui' 'src-tauri/target/release/{gui_name}' 'target/release/{gui_name}'; do "
+                f"  if [ -f \"$gb\" ]; then "
+                f"    cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; "
+                f"    chmod +x '/workspace/dist/{app_name}-gui-linux.x86_64' 2>/dev/null || true; "
+                f"    break; "
+                f"  fi; "
+                f"done; "
+                if build_gui
+                else ""
+            )
+            bundle_step = (
+                f"find /tmp/cargo-target/release/bundle/ src-tauri/target/release/bundle/ target/release/bundle/ -type f \\( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \\) -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true"
+                if build_gui and copy_bundles
+                else ""
+            )
+            linux_script = f"{clean_cmd}export APPIMAGE_EXTRACT_AND_RUN=1; export NO_STRIP=1; mkdir -p /workspace/dist; {cli_step}{gui_step}{bundle_step}"
+        elif ptype.kind == ProjectTypeKind.RUST:
+            if component == "gui":
+                linux_script = f"{clean_cmd}echo '[dev-forge : Linux] GUI no aplicable para proyecto Rust estándar.';"
+            else:
+                linux_script = (
+                    f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release && "
+                    f"if [ -f '/tmp/cargo-target/release/{app_name}' ]; then "
+                    f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
+                    f"  chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true; "
+                    f"fi"
+                )
+        elif ptype.kind == ProjectTypeKind.PYTHON:
+            if (project_path / "main.py").is_file():
+                if use_nuitka:
+                    py_standalone = (
+                        f"if command -v nuitka >/dev/null 2>&1; then "
+                        f"nuitka --standalone --onefile --output-dir=/tmp/nuitka-out --product-version={wix_ver} "
+                        f"--assume-yes-for-downloads main.py -o {app_name}-cli-linux.x86_64 && mkdir -p /workspace/dist && "
+                        f"cp /tmp/nuitka-out/{app_name}-cli-linux.x86_64 /workspace/dist/; else "
+                        f"pyinstaller --clean -F --name {app_name}-cli-linux.x86_64 main.py --distpath /workspace/dist/; fi"
+                    )
+                else:
+                    py_standalone = f"pyinstaller --clean -F --name {app_name}-cli-linux.x86_64 main.py --distpath /workspace/dist/"
+                linux_script = f"{clean_cmd}cd /workspace && {py_standalone}"
+            else:
+                linux_script = f"{clean_cmd}cd /workspace && python3 -m build -o /workspace/dist/ 2>/dev/null || python3 -m pip wheel . -w /workspace/dist/"
+        elif ptype.kind == ProjectTypeKind.JAVA:
+            linux_script = (
+                f"{clean_cmd}cd /workspace && chmod +x ./gradlew 2>/dev/null || true; "
+                f"(if [ -f ./gradlew ]; then ./gradlew build; elif [ -f pom.xml ]; then mvn package; else gradle build; fi) && "
+                f"find build/libs/ target/ -name '*.jar' ! -name '*-plain.jar' -exec cp {{}} /workspace/dist/ \\; 2>/dev/null || true"
+            )
+        elif ptype.kind == ProjectTypeKind.GO:
+            linux_script = (
+                f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace && (GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' . 2>/dev/null || "
+                f"GOCACHE=/tmp/go-cache go build -o '/workspace/dist/{app_name}-cli-linux.x86_64' ./...) && chmod +x '/workspace/dist/{app_name}-cli-linux.x86_64' 2>/dev/null || true"
+            )
+        elif ptype.kind == ProjectTypeKind.NODE:
+            linux_script = (
+                f"{clean_cmd}cd /workspace && (npm run build || yarn build || pnpm build) && "
+                f"cp -r dist/* build/* /workspace/dist/ 2>/dev/null || true"
+            )
+        elif ptype.kind == ProjectTypeKind.CCPP:
+            linux_script = (
+                f"{clean_cmd}rm -rf /tmp/build && mkdir -p /tmp/build /workspace/dist && cd /workspace && cmake -B /tmp/build -S . -G Ninja && "
+                f"cmake --build /tmp/build && find /tmp/build -maxdepth 2 -type f -executable ! -name '*.ninja*' ! -name '*.cmake' "
+                f"-exec cp {{}} '/workspace/dist/{app_name}-cli-linux.x86_64' \\; 2>/dev/null || true"
+            )
+        else:
+            linux_script = (
+                f"{clean_cmd}cd /workspace && if [ -f ./build.sh ]; then bash ./build.sh; elif [ -f ./Makefile ]; then make; fi"
+            )
+
+    if is_test_mode:
+        if ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
+            macos_script = (
+                f"echo '=== [dev-forge : macOS] Compilando suite de testing macOS para {app_name} ==='; "
+                f"mkdir -p /workspace/dist; "
+                f"cd /workspace; "
+                f"rustup target add x86_64-apple-darwin aarch64-apple-darwin 2>/dev/null || true; "
+                f"CARGO_TARGET_DIR=/tmp/cargo-target cargo test --target x86_64-apple-darwin --no-run --release 2>/dev/null || true; "
+                f"for tb in $(find /tmp/cargo-target/x86_64-apple-darwin/release/deps/ -maxdepth 1 -type f -executable ! -name '*.so' ! -name '*.d' 2>/dev/null); do "
+                f"  tb_base=$(basename \"$tb\"); "
+                f"  if [[ \"$tb_base\" =~ ^{app_name}- ]] || [[ \"$tb_base\" == \"{app_name}\" ]]; then "
+                f"    cp \"$tb\" '/workspace/dist/{app_name}-test-darwin.x86_64'; "
+                f"    chmod +x '/workspace/dist/{app_name}-test-darwin.x86_64' 2>/dev/null || true; "
+                f"    echo '[dev-forge : macOS] Binario de prueba generado: /workspace/dist/{app_name}-test-darwin.x86_64'; "
+                f"    break; "
+                f"  fi; "
+                f"done;"
+            )
+        elif ptype.kind == ProjectTypeKind.GO:
+            macos_script = (
+                f"mkdir -p /workspace/dist && cd /workspace; "
+                f"echo '=== [dev-forge : macOS] Compilando suite de testing Go para Darwin ==='; "
+                f"GOCACHE=/tmp/go-cache GOOS=darwin GOARCH=amd64 go test -c -o '/workspace/dist/{app_name}-test-darwin.x86_64' . 2>/dev/null || true; "
+                f"chmod +x '/workspace/dist/{app_name}-test-darwin.*' 2>/dev/null || true;"
+            )
+        else:
+            macos_script = "echo '[dev-forge : macOS] Compilación de test para macOS omitida para este proyecto.';"
+    elif component == "gui":
+        macos_script = "echo '[dev-forge : macOS] Compilación de GUI para macOS omitida (solo CLI).';"
+    elif ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
         macos_script = (
             f"echo '=== [dev-forge : macOS] Compilando binarios Darwin Mach-O para {app_name} ==='; "
             f"mkdir -p /workspace/dist; "
@@ -523,6 +672,9 @@ def build_on_windows(
     compiler: str = "nuitka",
     pyinstaller: bool = False,
     ver_info=None,
+    component: str = "all",
+    package: str = "all",
+    is_test_mode: bool = False,
 ) -> None:
     """Execute isolated build pass on forge-windows."""
     ensure_mutual_exclusion("forge-windows")
@@ -598,69 +750,125 @@ def build_on_windows(
     raw_ver = ver_info.raw if ver_info else "0.1.0"
     branch = ver_info.branch if ver_info else ""
 
-    if ptype.kind == ProjectTypeKind.RUST_TAURI:
-        build_ps = (
-            f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; "
-            f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
-            f"cargo build --release; "
-            f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}; "
-            f"if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ cargo tauri build }} "
-            f"elseif (Get-Command npx.cmd -ErrorAction SilentlyContinue) {{ npx --yes @tauri-apps/cli build }} "
-            f"else {{ cargo build --release }}; "
-            f"if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} "
-            f"elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} "
-            f"elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }}; "
-            f"if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}"
-        )
-    elif ptype.kind == ProjectTypeKind.RUST:
-        build_ps = (
-            f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
-            f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
-            f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}"
-        )
-    elif ptype.kind == ProjectTypeKind.PYTHON:
-        if use_nuitka:
-            py_cmd = (
-                f"if (Test-Path main.py) {{ "
-                f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
-                f"$icoOpt = if ($ico) {{ \"--windows-icon-from-ico='$ico'\" }} else {{ '' }}; "
-                f"Invoke-Expression \"nuitka --standalone --onefile --output-dir=C:\\target\\nuitka-out $icoOpt --product-version='{wix_ver}' --file-version='{wix_ver}' --assume-yes-for-downloads main.py -o {app_name}-cli-windows.x86_64.exe 2>&1\" | Out-Host; "
-                f"if (Test-Path C:\\target\\nuitka-out\\{app_name}-cli-windows.x86_64.exe) {{ Copy-Item C:\\target\\nuitka-out\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\ -Force; exit 0 }} else {{ "
-                f"Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
-                f"if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ exit 0 }} else {{ exit 1 }} }} }} else {{ python -m build -o C:\\workspace\\dist }}"
+    if is_test_mode:
+        if ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
+            build_ps = (
+                f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; "
+                f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
+                f"Write-Host '=== [dev-forge : Windows] Compilando suite de testing para {app_name} ==='; "
+                f"cargo test --no-run --release; "
+                f"$testBin = Get-ChildItem -Path C:\\target\\release\\deps -Filter '*.exe' -ErrorAction SilentlyContinue | Where-Object {{ $_.Name -like '{app_name}-*.exe' }} | Select-Object -First 1; "
+                f"if (-not $testBin) {{ $testBin = Get-ChildItem -Path C:\\target\\release\\deps -Filter '*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 }}; "
+                f"if ($testBin) {{ "
+                f"  Copy-Item $testBin.FullName 'C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe' -Force; "
+                f"  Write-Host \"[dev-forge : Windows] Binario de prueba generado: C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe\"; "
+                f"}}"
+            )
+        elif ptype.kind == ProjectTypeKind.GO:
+            build_ps = (
+                f"{init_prefix}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
+                f"Write-Host '=== [dev-forge : Windows] Compilando suite de testing Go para {app_name} ==='; "
+                f"go test -c -o 'C:\\workspace\\dist\\{app_name}-test-windows.x86_64.exe' . "
+            )
+        elif ptype.kind == ProjectTypeKind.PYTHON:
+            build_ps = (
+                f"{init_prefix}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
+                f"Write-Host '=== [dev-forge : Windows] Verificando tests Python ==='; "
+                f"python -m unittest discover tests 2>&1 | Tee-Object C:\\workspace\\dist\\test-results-windows.log"
             )
         else:
-            py_cmd = (
-                f"if (Test-Path main.py) {{ "
-                f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
-                f"$icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; "
-                f"Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
-                f"if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
-            )
-        build_ps = f"{init_prefix}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {py_cmd}"
-    elif ptype.kind == ProjectTypeKind.CCPP:
-        build_ps = (
-            f"{init_prefix}{vs_shell_init}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; "
-            f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
-            f"Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Where-Object {{ $_.Name -notmatch '(?i)(ninja|compiler)' }} | Select-Object -First 1 | Copy-Item -Destination 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force"
-        )
-    elif ptype.kind == ProjectTypeKind.GO:
-        build_ps = (
-            f"{init_prefix}Set-Location C:\\workspace; "
-            f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
-            f"go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' . ; "
-            f"if (-not (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe')) {{ go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' ./... }}"
-        )
+            build_ps = f"{init_prefix}Set-Location C:\\workspace; Write-Host '[dev-forge : Windows] Testing no configurado para este tipo de proyecto.'"
     else:
-        build_ps = (
-            f"{init_prefix}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}"
-        )
+        build_cli = component in ("all", "cli")
+        build_gui = component in ("all", "gui")
+
+        if ptype.kind == ProjectTypeKind.RUST_TAURI:
+            cli_part = (
+                f"cargo build --release; "
+                f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}; "
+                if build_cli
+                else ""
+            )
+            gui_part = (
+                f"if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ cargo tauri build }} "
+                f"elseif (Get-Command npx.cmd -ErrorAction SilentlyContinue) {{ npx --yes @tauri-apps/cli build }} "
+                f"else {{ cargo build --release }}; "
+                f"if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} "
+                f"elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} "
+                f"elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }}; "
+                f"if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}; "
+                if build_gui
+                else ""
+            )
+            build_ps = f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {cli_part}{gui_part}"
+        elif ptype.kind == ProjectTypeKind.RUST:
+            if component == "gui":
+                build_ps = f"{init_prefix}Write-Host '[dev-forge : Windows] GUI no aplicable para proyecto Rust estándar.'"
+            else:
+                build_ps = (
+                    f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
+                    f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
+                    f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force }}"
+                )
+        elif ptype.kind == ProjectTypeKind.PYTHON:
+            if use_nuitka:
+                py_cmd = (
+                    f"if (Test-Path main.py) {{ "
+                    f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
+                    f"$icoOpt = if ($ico) {{ \"--windows-icon-from-ico='$ico'\" }} else {{ '' }}; "
+                    f"Invoke-Expression \"nuitka --standalone --onefile --output-dir=C:\\target\\nuitka-out $icoOpt --product-version='{wix_ver}' --file-version='{wix_ver}' --assume-yes-for-downloads main.py -o {app_name}-cli-windows.x86_64.exe 2>&1\" | Out-Host; "
+                    f"if (Test-Path C:\\target\\nuitka-out\\{app_name}-cli-windows.x86_64.exe) {{ Copy-Item C:\\target\\nuitka-out\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\ -Force; exit 0 }} else {{ "
+                    f"Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
+                    f"if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ exit 0 }} else {{ exit 1 }} }} }} else {{ python -m build -o C:\\workspace\\dist }}"
+                )
+            else:
+                py_cmd = (
+                    f"if (Test-Path main.py) {{ "
+                    f"$ico = & C:\\forge\\provision\\windows\\package-artifacts.ps1 -FindIconOnly -WorkspaceDir C:\\workspace -TargetDir C:\\target; "
+                    f"$icoOpt = if ($ico) {{ \"--icon '$ico'\" }} else {{ '' }}; "
+                    f"Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
+                    f"if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ exit 0 }} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
+                )
+            build_ps = f"{init_prefix}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {py_cmd}"
+        elif ptype.kind == ProjectTypeKind.CCPP:
+            build_ps = (
+                f"{init_prefix}{vs_shell_init}Set-Location C:\\workspace; cmake -B C:\\target -S . -G Ninja; cmake --build C:\\target; "
+                f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
+                f"Get-ChildItem -Path C:\\target -Filter '*.exe' -Recurse | Where-Object {{ $_.Name -notmatch '(?i)(ninja|compiler)' }} | Select-Object -First 1 | Copy-Item -Destination 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force"
+            )
+        elif ptype.kind == ProjectTypeKind.GO:
+            build_ps = (
+                f"{init_prefix}Set-Location C:\\workspace; "
+                f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
+                f"go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' . ; "
+                f"if (-not (Test-Path 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe')) {{ go build -o 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' ./... }}"
+            )
+        else:
+            build_ps = (
+                f"{init_prefix}Set-Location C:\\workspace; if (Test-Path .\\build.bat) {{ .\\build.bat }}"
+            )
 
     pack_ps = (
-        f"; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ "
-        f"& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' "
-        f"-AppVersion '{raw_ver}' -WixVersion '{wix_ver}' -GitBranch '{branch}' }}"
+        ""
+        if (package == "bin" or is_test_mode)
+        else (
+            f"; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ "
+            f"& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' "
+            f"-AppVersion '{raw_ver}' -WixVersion '{wix_ver}' -GitBranch '{branch}' }}"
+        )
     )
+    full_cmd = f"{build_ps}{pack_ps}"
+
+    log_info("Ejecutando proceso de compilación remota en Windows Server Core...")
+    success = run_vagrant_streaming(["winrm", "forge-windows", "-s", "powershell", "-c", full_cmd], envs)
+
+    if not keep_vm:
+        log_info("Liberando memoria del host (apagando forge-windows)...")
+        run_vagrant_streaming(["halt", "forge-windows"], envs)
+
+    if not success:
+        log_err("Fallo en la compilación en forge-windows")
+        sys.exit(1)
     full_cmd = f"{build_ps}{pack_ps}"
 
     log_info("Ejecutando proceso de compilación remota en Windows Server Core...")
