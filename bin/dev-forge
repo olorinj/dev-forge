@@ -5,6 +5,7 @@
 set -e
 
 FORGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export FORGE_DIR
 BIN_PATH="$FORGE_DIR/target/release/dev-forge"
 
 # 1. Si existe el binario release compilado, ejecutarlo inmediatamente

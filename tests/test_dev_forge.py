@@ -190,5 +190,19 @@ class TestDevForge(unittest.TestCase):
             self.assertEqual(versioned_win_gui, "lexishield-gui-2.0.1-windows.x86_64.exe")
 
 
+    def test_forge_dir_isolation_from_client_vagrantfile(self):
+        from dev_forge.vagrant import is_dev_forge_root
+        with tempfile.TemporaryDirectory() as tmp:
+            client_dir = Path(tmp)
+            # A client project that happens to have a Vagrantfile
+            (client_dir / "Vagrantfile").write_text("# client vagrantfile", encoding="utf-8")
+            self.assertFalse(is_dev_forge_root(client_dir))
+
+            # dev-forge has its ansible/linux.yml
+            (client_dir / "provision" / "ansible").mkdir(parents=True)
+            (client_dir / "provision" / "ansible" / "linux.yml").write_text("# ansible", encoding="utf-8")
+            self.assertTrue(is_dev_forge_root(client_dir))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,14 +16,47 @@ from dev_forge.detector import (
 from dev_forge.hardware import detect_hardware
 
 
+def is_dev_forge_root(p: Path) -> bool:
+    return (p / "Vagrantfile").is_file() and (
+        (p / "provision" / "ansible" / "linux.yml").is_file()
+        or (p / "provision" / "ansible").is_dir()
+        or (p / "provision" / "linux").is_dir()
+    )
+
+
 def get_forge_dir() -> Path:
     """Return the absolute path to the dev-forge workspace directory."""
-    return Path(__file__).resolve().parent.parent
+    # 1. Explicit FORGE_DIR
+    if "FORGE_DIR" in os.environ:
+        p = Path(os.environ["FORGE_DIR"]).resolve()
+        if is_dev_forge_root(p):
+            return p
+
+    # 2. Package root parent
+    pkg_root = Path(__file__).resolve().parent.parent
+    if is_dev_forge_root(pkg_root):
+        return pkg_root
+
+    # 3. Persisted forge root in ~/.dev-forge/forge-root.path
+    cfg_root_file = Path.home() / ".dev-forge" / "forge-root.path"
+    if cfg_root_file.is_file():
+        p = Path(cfg_root_file.read_text(encoding="utf-8").strip()).resolve()
+        if is_dev_forge_root(p):
+            return p
+
+    # 4. Current dir only if verified
+    cwd = Path.cwd().resolve()
+    if is_dev_forge_root(cwd):
+        return cwd
+
+    return pkg_root
 
 
 def run_vagrant_streaming(args: List[str], envs: Optional[Dict[str, str]] = None) -> bool:
     """Execute a vagrant command streaming output directly to the terminal."""
+    forge_dir = get_forge_dir()
     env = os.environ.copy()
+    env["VAGRANT_CWD"] = str(forge_dir)
     if envs:
         env.update(envs)
 
@@ -31,7 +64,7 @@ def run_vagrant_streaming(args: List[str], envs: Optional[Dict[str, str]] = None
     try:
         proc = subprocess.Popen(
             cmd,
-            cwd=get_forge_dir(),
+            cwd=forge_dir,
             env=env,
             stdout=sys.stdout,
             stderr=sys.stderr,

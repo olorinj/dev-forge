@@ -10,21 +10,50 @@ use colored::Colorize;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+pub fn is_dev_forge_root(p: &Path) -> bool {
+    p.join("Vagrantfile").is_file()
+        && (p.join("provision/ansible/linux.yml").is_file()
+            || p.join("provision/ansible").is_dir()
+            || p.join("provision/linux").is_dir())
+}
+
 pub fn get_forge_dir() -> PathBuf {
-    // Current directory or binary directory parent
-    if Path::new("Vagrantfile").is_file() {
-        return std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    // 1. Explicit FORGE_DIR env var
+    if let Ok(dir_str) = std::env::var("FORGE_DIR") {
+        let p = PathBuf::from(dir_str);
+        if is_dev_forge_root(&p) {
+            return p;
+        }
     }
+
+    // 2. Binary location ancestors (resolving symlinks with canonicalize)
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            // Check if exe is in target/release or bin
+        let real_exe = exe.canonicalize().unwrap_or(exe);
+        if let Some(parent) = real_exe.parent() {
             for ancestor in parent.ancestors() {
-                if ancestor.join("Vagrantfile").is_file() {
+                if is_dev_forge_root(ancestor) {
                     return ancestor.to_path_buf();
                 }
             }
         }
     }
+
+    // 3. Persisted forge root in ~/.dev-forge/forge-root.path
+    let root_file = crate::config::get_user_config_dir().join("forge-root.path");
+    if let Ok(content) = std::fs::read_to_string(&root_file) {
+        let p = PathBuf::from(content.trim());
+        if is_dev_forge_root(&p) {
+            return p;
+        }
+    }
+
+    // 4. Current working directory only if strictly verified as dev-forge
+    if let Ok(cwd) = std::env::current_dir() {
+        if is_dev_forge_root(&cwd) {
+            return cwd;
+        }
+    }
+
     PathBuf::from(".")
 }
 
@@ -32,6 +61,7 @@ pub fn run_vagrant_streaming(args: &[&str], envs: &[(&str, &str)]) -> Result<boo
     let forge_dir = get_forge_dir();
     let mut cmd = Command::new("vagrant");
     cmd.args(args).current_dir(&forge_dir);
+    cmd.env("VAGRANT_CWD", &forge_dir);
 
     for (k, v) in envs {
         cmd.env(k, v);

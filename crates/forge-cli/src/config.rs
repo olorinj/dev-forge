@@ -32,6 +32,15 @@ pub fn save_host_profile(profile: &HostProfile) -> Result<()> {
     std::fs::write(&toml_path, toml_str)
         .with_context(|| format!("Failed to write config.toml at {:?}", toml_path))?;
 
+    // Save forge-root.path for global invocation reliability
+    let forge_dir = crate::vagrant::get_forge_dir();
+    if forge_dir != std::path::Path::new(".") {
+        let _ = std::fs::write(
+            config_dir.join("forge-root.path"),
+            forge_dir.display().to_string(),
+        );
+    }
+
     // 2. Synchronize forge-host.env for 100% Vagrantfile compatibility
     let env_content = format!(
         r#"# =============================================================================
