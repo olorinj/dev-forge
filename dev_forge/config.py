@@ -88,6 +88,14 @@ cpus = {cpus}
 """
     toml_path.write_text(toml_content, encoding="utf-8")
 
+    # Persist dev-forge root directory for out-of-tree executions
+    forge_dir = Path(__file__).resolve().parent.parent
+    root_file = config_dir / "forge-root.path"
+    try:
+        root_file.write_text(str(forge_dir), encoding="utf-8")
+    except Exception:
+        pass
+
     log_ok(f"Perfil de hardware guardado en: {env_path}")
     log_info(
         f"Dimensionado: Linux={linux_mem}MB ({cpus} cpus), Windows={win_mem}MB ({cpus} cpus), Teclado={hw.keyboard_layout}"
@@ -114,3 +122,86 @@ def load_host_profile() -> None:
                     os.environ[k] = v
     except Exception:
         pass
+
+
+def get_recent_projects_path() -> Path:
+    """Return path to recent projects json file."""
+    return get_user_config_dir() / "recent_projects.json"
+
+
+def load_recent_projects() -> list[Path]:
+    """Load list of recent client projects, filtering by existence."""
+    p = get_recent_projects_path()
+    if p.is_file():
+        try:
+            import json
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                res = []
+                for item in data:
+                    pb = Path(item)
+                    if pb.exists() and pb not in res:
+                        res.append(pb)
+                return res[:5]
+        except Exception:
+            pass
+    return []
+
+
+def save_recent_project(path: Path) -> None:
+    """Add a project to the recent projects list, keeping up to 5."""
+    try:
+        canonical = path.resolve()
+    except Exception:
+        canonical = path
+
+    recents = load_recent_projects()
+    recents = [p for p in recents if p != canonical]
+    recents.insert(0, canonical)
+    recents = recents[:5]
+
+    config_dir = get_user_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    import json
+    get_recent_projects_path().write_text(
+        json.dumps([str(p) for p in recents], indent=2), encoding="utf-8"
+    )
+
+
+def expand_path(raw: str | Path) -> Path:
+    """Expand user tilde ~ and return Path."""
+    p_str = str(raw).strip()
+    if p_str.startswith("~"):
+        return Path(p_str).expanduser()
+    return Path(p_str)
+
+
+def install_local_bin() -> Path:
+    """Install or symlink dev-forge into ~/.local/bin."""
+    local_bin = Path.home() / ".local" / "bin"
+    local_bin.mkdir(parents=True, exist_ok=True)
+
+    target_symlink = local_bin / "dev-forge"
+
+    # Locate source binary or python entrypoint
+    forge_root = Path(__file__).resolve().parent.parent
+    rust_release = forge_root / "target" / "release" / "dev-forge"
+    rust_debug = forge_root / "target" / "debug" / "dev-forge"
+
+    if rust_release.is_file():
+        source_bin = rust_release
+    elif rust_debug.is_file():
+        source_bin = rust_debug
+    else:
+        # Fallback to dev-forge runner script
+        source_bin = forge_root / "dev-forge"
+
+    if os.name == "nt":
+        import shutil
+        shutil.copy2(source_bin, target_symlink.with_suffix(".exe"))
+        return target_symlink.with_suffix(".exe")
+    else:
+        if target_symlink.is_symlink() or target_symlink.is_file():
+            target_symlink.unlink(missing_ok=True)
+        target_symlink.symlink_to(source_bin.resolve())
+        return target_symlink

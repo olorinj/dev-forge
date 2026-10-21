@@ -268,3 +268,122 @@ pub fn export_profile_env(profile: &HostProfile) {
     std::env::set_var("FORGE_WIN_CPUS", profile.windows_cpus.to_string());
     std::env::set_var("FORGE_WIN_MEM", profile.windows_mem_mb.to_string());
 }
+
+pub fn get_recent_projects_path() -> PathBuf {
+    get_user_config_dir().join("recent_projects.json")
+}
+
+pub fn load_recent_projects() -> Vec<PathBuf> {
+    let p = get_recent_projects_path();
+    let mut projects = Vec::new();
+    if let Ok(content) = std::fs::read_to_string(&p) {
+        for line in content.lines() {
+            let trimmed = line
+                .trim()
+                .trim_matches(|c| c == '[' || c == ']' || c == ',');
+            let trimmed = trimmed.trim();
+            if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
+                let unquoted = &trimmed[1..trimmed.len() - 1];
+                let unescaped = unquoted.replace("\\\\", "\\").replace("\\\"", "\"");
+                if !unescaped.is_empty() {
+                    let pb = PathBuf::from(unescaped);
+                    if pb.exists() && !projects.contains(&pb) {
+                        projects.push(pb);
+                    }
+                }
+            }
+        }
+    }
+    projects
+}
+
+pub fn save_recent_project(path: &std::path::Path) {
+    let canonical = match path.canonicalize() {
+        Ok(c) => c,
+        Err(_) => path.to_path_buf(),
+    };
+    let mut recents = load_recent_projects();
+    recents.retain(|p| p != &canonical);
+    recents.insert(0, canonical);
+    recents.truncate(5);
+
+    let mut json = String::from("[\n");
+    for (i, p) in recents.iter().enumerate() {
+        let s = p.display().to_string();
+        let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
+        json.push_str(&format!("  \"{}\"", escaped));
+        if i + 1 < recents.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+    json.push_str("]\n");
+
+    let _ = std::fs::create_dir_all(get_user_config_dir());
+    let _ = std::fs::write(get_recent_projects_path(), json);
+}
+
+pub fn expand_path(raw: &str) -> PathBuf {
+    let trimmed = raw.trim();
+    if trimmed.starts_with("~/") || trimmed == "~" {
+        if let Some(user_dirs) = directories::UserDirs::new() {
+            let home = user_dirs.home_dir();
+            if trimmed == "~" {
+                return home.to_path_buf();
+            } else {
+                return home.join(&trimmed[2..]);
+            }
+        }
+    }
+    PathBuf::from(trimmed)
+}
+
+pub fn install_local_bin() -> Result<PathBuf> {
+    let local_bin = if let Some(user_dirs) = directories::UserDirs::new() {
+        user_dirs.home_dir().join(".local").join("bin")
+    } else {
+        PathBuf::from("/usr/local/bin")
+    };
+    std::fs::create_dir_all(&local_bin)?;
+
+    let target_symlink = local_bin.join("dev-forge");
+    let current_exe = std::env::current_exe()?;
+    let canonical_exe = current_exe.canonicalize().unwrap_or(current_exe);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        if target_symlink.is_file() || target_symlink.is_symlink() {
+            let _ = std::fs::remove_file(&target_symlink);
+        }
+        symlink(&canonical_exe, &target_symlink)
+            .with_context(|| format!("No se pudo crear symlink en {:?}", target_symlink))?;
+    }
+
+    #[cfg(windows)]
+    {
+        std::fs::copy(&canonical_exe, &target_symlink)?;
+    }
+
+    Ok(target_symlink)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expand_path_relative() {
+        let p = expand_path("some/path/project");
+        assert_eq!(p, PathBuf::from("some/path/project"));
+    }
+
+    #[test]
+    fn test_expand_path_home() {
+        if let Some(user_dirs) = directories::UserDirs::new() {
+            let home = user_dirs.home_dir();
+            assert_eq!(expand_path("~"), home.to_path_buf());
+            assert_eq!(expand_path("~/workspace"), home.join("workspace"));
+        }
+    }
+}

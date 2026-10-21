@@ -57,6 +57,7 @@ def run_vagrant_streaming(args: List[str], envs: Optional[Dict[str, str]] = None
     forge_dir = get_forge_dir()
     env = os.environ.copy()
     env["VAGRANT_CWD"] = str(forge_dir)
+    env["VAGRANT_DOTFILE_PATH"] = str(forge_dir / ".vagrant")
     if envs:
         env.update(envs)
 
@@ -195,7 +196,7 @@ def cmd_test_vm(machine: str) -> None:
 
 
 def cmd_build(
-    project_path: Path,
+    project_path: Path | None = None,
     target: str | None = None,
     clean: bool = False,
     keep_vm: bool = False,
@@ -209,20 +210,14 @@ def cmd_build(
     interactive: bool = False,
 ) -> None:
     """Compile a project inside the isolated VM environment."""
-    from dev_forge.config import load_host_profile
+    from dev_forge.config import expand_path, load_host_profile, save_recent_project
     from dev_forge.menu import prompt_menu
 
     load_host_profile()
 
-    if not project_path.exists():
-        log_err(f"Ruta de proyecto inválida o no encontrada: {project_path}")
-        sys.exit(1)
-
-    project_canonical = project_path.resolve()
-
     class BuildOptions:
         def __init__(self):
-            self.project = project_canonical
+            self.project = project_path
             self.target = target
             self.component = component
             self.package = package
@@ -230,11 +225,22 @@ def cmd_build(
             self.test = test
 
     opts = BuildOptions()
-    is_interactive = interactive or (
-        target is None and component is None and package is None and not test
+    is_interactive = (
+        interactive
+        or opts.project is None
+        or (target is None and component is None and package is None and not test)
     )
     if is_interactive:
         prompt_menu(opts)
+
+    raw_project = opts.project or Path.cwd()
+    expanded = expand_path(raw_project)
+    if not expanded.exists():
+        log_err(f"Ruta de proyecto inválida o no encontrada: {expanded}")
+        sys.exit(1)
+
+    project_canonical = expanded.resolve()
+    save_recent_project(project_canonical)
 
     target_res = opts.target or "all"
     component_res = opts.component or ("test" if opts.test else "all")
@@ -621,8 +627,17 @@ def build_on_linux(
         else:
             macos_script = "echo '[dev-forge : macOS] Compilación de test para macOS omitida para este proyecto.';"
     elif component == "gui":
-        macos_script = "echo '[dev-forge : macOS] Compilación de GUI para macOS omitida (solo CLI).';"
+        macos_script = (
+            "echo '[dev-forge : macOS : AVISO] Los paquetes GUI nativos de macOS (.app/.dmg) requieren frameworks "
+            "de Cocoa/WebKit y un entorno de compilación macOS nativo. Compilación GUI omitida.';"
+        )
     elif ptype.kind in (ProjectTypeKind.RUST, ProjectTypeKind.RUST_TAURI):
+        tauri_macos_note = (
+            "echo '[dev-forge : macOS : INFO] Binarios CLI Mach-O compilados para macOS. "
+            "Los instaladores GUI nativos (.dmg/.app) requieren un entorno macOS nativo con Cocoa/WebKit.'; "
+            if ptype.kind == ProjectTypeKind.RUST_TAURI
+            else ""
+        )
         macos_script = (
             f"echo '=== [dev-forge : macOS] Compilando binarios Darwin Mach-O para {app_name} ==='; "
             f"mkdir -p /workspace/dist; "
@@ -663,7 +678,8 @@ def build_on_linux(
             f"    echo '[dev-forge : macOS] Generado: /workspace/dist/{app_name}-cli-darwin.aarch64 ({raw_ver})'; "
             f"    break; "
             f"  fi; "
-            f"done;"
+            f"done; "
+            f"{tauri_macos_note}"
         )
     elif ptype.kind == ProjectTypeKind.GO:
         macos_script = (
@@ -846,11 +862,16 @@ def build_on_windows(
                 f"if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ cargo tauri build }} "
                 f"elseif (Get-Command npx.cmd -ErrorAction SilentlyContinue) {{ npx --yes @tauri-apps/cli build }} "
                 f"else {{ cargo build --release }}; "
-                f"if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} "
-                f"elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} "
-                f"elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }}; "
+                f"$guiFound = $false; "
+                f"if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }} "
+                f"elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }} "
+                f"elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }}; "
+                f"if (-not $guiFound) {{ "
+                f"  $guiCandidate = Get-ChildItem -Path @('C:\\target\\release', 'src-tauri\\target\\release', 'target\\release') -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -notmatch '[\\\\/](deps|build|incremental|examples)[\\\\/]' -and $_.Name -notmatch '(?i)(cargo|rustc|-cli-|^vc_)' -and $_.Name -ne '{app_name}-cli-windows.x86_64.exe' }} | Select-Object -First 1; "
+                f"  if ($guiCandidate) {{ Copy-Item $guiCandidate.FullName 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }}; "
+                f"}}; "
                 f"if (Test-Path 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe') {{ Copy-Item 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-gui-{raw_ver}-windows.x86_64.exe' -Force }}; "
-                f"if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}; "
+                f"@('src-tauri\\target\\release\\bundle', 'target\\release\\bundle', 'C:\\target\\release\\bundle') | ForEach-Object {{ if (Test-Path $_) {{ Copy-Item -Recurse \"$_\\*\" C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }} }}; "
                 if build_gui
                 else ""
             )
@@ -923,18 +944,6 @@ def build_on_windows(
             f"-AppVersion '{raw_ver}' -WixVersion '{wix_ver}' -GitBranch '{branch}' }}"
         )
     )
-    full_cmd = f"{build_ps}{pack_ps}"
-
-    log_info("Ejecutando proceso de compilación remota en Windows Server Core...")
-    success = run_vagrant_streaming(["winrm", "forge-windows", "-s", "powershell", "-c", full_cmd], envs)
-
-    if not keep_vm:
-        log_info("Liberando memoria del host (apagando forge-windows)...")
-        run_vagrant_streaming(["halt", "forge-windows"], envs)
-
-    if not success:
-        log_err("Fallo en la compilación en forge-windows")
-        sys.exit(1)
     full_cmd = f"{build_ps}{pack_ps}"
 
     log_info("Ejecutando proceso de compilación remota en Windows Server Core...")

@@ -199,10 +199,12 @@ if ($guiExe) {
 
 foreach ($exe in $targetExes) {
     $rawBaseName = $exe.BaseName
-    $cleanAppName = $rawBaseName -replace '-(gui|cli)-windows\.x86_64$', ''
-    $baseName = $cleanAppName
+    $cleanAppName = $rawBaseName -replace '-(gui|cli)(-[\d\w\.\-]+)?-windows\.x86_64$', ''
+    $isGui = ($exe.Name -match "(?i)gui")
+    $baseName = if ($isGui) { "$cleanAppName-gui" } else { $cleanAppName }
+    $cleanVersion = $AppVersion
     $exeFullName = $exe.FullName
-    Write-Host "[dev-forge : packager] Empaquetando `"$baseName`" ($displayVersion)..." -ForegroundColor Cyan
+    Write-Host "[dev-forge : packager] Empaquetando `"$baseName`" ($cleanVersion)..." -ForegroundColor Cyan
 
     # --- 1. Generar instalador Inno Setup (.exe) ---
     if ($iscc) {
@@ -244,9 +246,9 @@ Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"$iconParam
         & $iscc /Q "$issPath"
         $standardSetup = Join-Path $DistDir "$baseName-setup.exe"
         if (Test-Path $standardSetup) {
-            # Duplicar con nombre versionado para releases
-            Copy-Item -Path $standardSetup -Destination (Join-Path $DistDir "$baseName-$displayVersion-setup.exe") -Force -ErrorAction SilentlyContinue
-            Write-Host "  [OK] Inno Setup: $baseName-setup.exe ($baseName-$displayVersion-setup.exe) generado exitosamente." -ForegroundColor Green
+            # Duplicar con nombre versionado semántico limpio para releases
+            Copy-Item -Path $standardSetup -Destination (Join-Path $DistDir "$baseName-$cleanVersion-setup.exe") -Force -ErrorAction SilentlyContinue
+            Write-Host "  [OK] Inno Setup: $baseName-setup.exe ($baseName-$cleanVersion-setup.exe) generado exitosamente." -ForegroundColor Green
         } else {
             Write-Warning "  [FALLO] No se pudo generar $baseName-setup.exe"
         }
@@ -316,9 +318,9 @@ Name: "{autodesktop}\$baseName"; Filename: "{app}\$($exe.Name)"$iconParam
             Remove-Item -Path (Join-Path $DistDir "$baseName.wixpdb") -Force -ErrorAction SilentlyContinue
         }
         if (Test-Path $msiPath) {
-            # Duplicar con nombre versionado para releases
-            Copy-Item -Path $msiPath -Destination (Join-Path $DistDir "$baseName-$displayVersion.msi") -Force -ErrorAction SilentlyContinue
-            Write-Host "  [OK] WiX MSI: $baseName.msi ($baseName-$displayVersion.msi) generado exitosamente." -ForegroundColor Green
+            # Duplicar con nombre versionado semántico limpio para releases
+            Copy-Item -Path $msiPath -Destination (Join-Path $DistDir "$baseName-$cleanVersion.msi") -Force -ErrorAction SilentlyContinue
+            Write-Host "  [OK] WiX MSI: $baseName.msi ($baseName-$cleanVersion.msi) generado exitosamente." -ForegroundColor Green
         } else {
             Write-Warning "  [FALLO] No se pudo generar $baseName.msi"
         }

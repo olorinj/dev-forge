@@ -164,6 +164,30 @@ class TestDevForge(unittest.TestCase):
         self.assertEqual(args.package, "bin")
         self.assertEqual(args.profile, "test")
 
+    def test_expand_path_and_recents(self):
+        from unittest.mock import patch
+        from dev_forge.config import expand_path, load_recent_projects, save_recent_project
+        self.assertEqual(expand_path("test/rel"), Path("test/rel"))
+        home_expanded = expand_path("~")
+        self.assertEqual(home_expanded, Path.home())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_cfg = Path(tmp)
+            with patch("dev_forge.config.get_user_config_dir", return_value=tmp_cfg):
+                p = tmp_cfg / "my_project"
+                p.mkdir()
+                save_recent_project(p)
+                recents = load_recent_projects()
+                self.assertTrue(any(r == p.resolve() for r in recents))
+
+    def test_cli_optional_project(self):
+        from dev_forge.cli import create_parser
+        parser = create_parser()
+        args = parser.parse_args(["build"])
+        self.assertIsNone(args.project)
+        args_with_p = parser.parse_args(["build", "-p", "/some/path"])
+        self.assertEqual(args_with_p.project, Path("/some/path"))
+
 
     def test_versioned_binary_naming_convention(self):
         from dev_forge.detector import extract_project_version, extract_project_name

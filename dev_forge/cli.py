@@ -75,8 +75,9 @@ def create_parser() -> argparse.ArgumentParser:
         "-p",
         "--project",
         type=Path,
-        required=True,
-        help="Path to the client project to compile (mandatory)",
+        nargs="?",
+        default=None,
+        help="Path to the client project to compile (defaults to interactive selection or current dir)",
     )
     build_parser.add_argument(
         "-t",
@@ -191,6 +192,9 @@ def create_parser() -> argparse.ArgumentParser:
     comp_parser = subparsers.add_parser("completions", help="Generate shell completions")
     comp_parser.add_argument("shell", choices=["bash", "zsh", "powershell", "fish"])
 
+    # 12. install-bin
+    subparsers.add_parser("install-bin", help="Install dev-forge binary into ~/.local/bin")
+
     return parser
 
 
@@ -202,6 +206,12 @@ def main(argv=None) -> None:
 
     if args.subcommand == "tune":
         generate_host_profile()
+        from dev_forge.config import install_local_bin
+        try:
+            installed = install_local_bin()
+            print(f"[dev-forge] Enlace symlink actualizado en: {installed}")
+        except Exception as e:
+            print(f"[dev-forge : AVISO] No se pudo crear symlink en ~/.local/bin: {e}")
     elif args.subcommand == "status":
         cmd_status()
     elif args.subcommand == "up":
@@ -240,3 +250,7 @@ def main(argv=None) -> None:
         clean_cache(args.subsystem)
     elif args.subcommand == "completions":
         print(f"# Completions for {args.shell} are automatically supported via dev-forge")
+    elif args.subcommand == "install-bin":
+        from dev_forge.config import install_local_bin
+        installed = install_local_bin()
+        print(f"[dev-forge] Ejecutable instalado con éxito en: {installed}")

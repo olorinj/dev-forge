@@ -8,7 +8,54 @@ from typing import Any
 
 def prompt_menu(args: Any) -> None:
     """Prompts an interactive terminal menu allowing the user to select
-    Component, Target OS, Packaging format, and Build Profile."""
+    Project (if not set), Component, Target OS, Packaging format, and Build Profile."""
+    from pathlib import Path
+    from dev_forge.config import expand_path, load_recent_projects
+    from dev_forge.detector import ProjectTypeKind, detect_project_type
+
+    # 0. Project Selection if None or not provided
+    if getattr(args, "project", None) is None:
+        cwd = Path.cwd()
+        detected_here = detect_project_type(cwd)
+        if detected_here.kind != ProjectTypeKind.GENERIC:
+            args.project = cwd
+        else:
+            recents = load_recent_projects()
+            if recents:
+                print("\n\033[1;33m? [0/4] Seleccione el proyecto a compilar:\033[0m")
+                for idx, r in enumerate(recents, start=1):
+                    tag = " \033[2m[Último usado]\033[0m" if idx == 1 else ""
+                    print(f"  [{idx}] \033[1m{r}\033[0m{tag}")
+                manual_idx = len(recents) + 1
+                print(f"  [{manual_idx}] Introducir ruta manual...")
+                try:
+                    choice = input(
+                        f"\033[1mOpción [1-{manual_idx}] (Intro para opción 1): \033[0m"
+                    ).strip()
+                except (EOFError, KeyboardInterrupt):
+                    choice = "1"
+                try:
+                    chosen_num = int(choice) if choice else 1
+                except ValueError:
+                    chosen_num = 1
+
+                if 1 <= chosen_num <= len(recents):
+                    args.project = recents[chosen_num - 1]
+                else:
+                    try:
+                        manual = input("\033[1mIntroduzca la ruta del proyecto: \033[0m").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        manual = "."
+                    args.project = expand_path(manual)
+            else:
+                try:
+                    manual = input(
+                        "\033[1;33m? Introduzca la ruta del proyecto a compilar: \033[0m"
+                    ).strip()
+                except (EOFError, KeyboardInterrupt):
+                    manual = "."
+                args.project = expand_path(manual)
+
     print("\n\033[1;36m================================================================\033[0m")
     print("\033[1;36m       dev-forge : Menú de Compilación Interactivo\033[0m")
     print("\033[1;36m================================================================\033[0m")

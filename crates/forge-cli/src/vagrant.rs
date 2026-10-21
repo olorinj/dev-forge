@@ -62,6 +62,7 @@ pub fn run_vagrant_streaming(args: &[&str], envs: &[(&str, &str)]) -> Result<boo
     let mut cmd = Command::new("vagrant");
     cmd.args(args).current_dir(&forge_dir);
     cmd.env("VAGRANT_CWD", &forge_dir);
+    cmd.env("VAGRANT_DOTFILE_PATH", forge_dir.join(".vagrant"));
 
     for (k, v) in envs {
         cmd.env(k, v);
@@ -303,16 +304,8 @@ pub fn cmd_test_vm(machine: &str) -> Result<()> {
 pub fn cmd_build(args: &mut BuildArgs) -> Result<()> {
     crate::config::load_host_profile()?;
 
-    let project_path = args.project.canonicalize().with_context(|| {
-        format!(
-            "Ruta de proyecto invalida o no encontrada: {:?}",
-            args.project
-        )
-    })?;
-
-    // If only project is passed (no target, no component, no package, no test flag)
-    // or if --interactive is passed, trigger the interactive selection menu:
     let is_interactive = args.interactive
+        || args.project.is_none()
         || (args.target.is_none()
             && args.component.is_none()
             && args.package.is_none()
@@ -321,6 +314,17 @@ pub fn cmd_build(args: &mut BuildArgs) -> Result<()> {
     if is_interactive {
         let _ = crate::menu::prompt_menu(args);
     }
+
+    let raw_project = args
+        .project
+        .clone()
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let expanded = crate::config::expand_path(&raw_project.to_string_lossy());
+    let project_path = expanded
+        .canonicalize()
+        .with_context(|| format!("Ruta de proyecto inválida o no encontrada: {:?}", expanded))?;
+
+    crate::config::save_recent_project(&project_path);
 
     let target = args.target.unwrap_or(TargetPlatform::All);
     let component = args.component.unwrap_or(if args.test {
@@ -379,17 +383,17 @@ pub fn cmd_build(args: &mut BuildArgs) -> Result<()> {
 
     match target {
         TargetPlatform::Linux => {
-            build_on_linux(&ptype, args, &envs, true, false)?;
+            build_on_linux(&project_path, &ptype, args, &envs, true, false)?;
         }
         TargetPlatform::Macos => {
-            build_on_linux(&ptype, args, &envs, false, true)?;
+            build_on_linux(&project_path, &ptype, args, &envs, false, true)?;
         }
         TargetPlatform::Windows => {
-            build_on_windows(&ptype, args, &envs)?;
+            build_on_windows(&project_path, &ptype, args, &envs)?;
         }
         TargetPlatform::All => {
-            build_on_linux(&ptype, args, &envs, true, true)?;
-            build_on_windows(&ptype, args, &envs)?;
+            build_on_linux(&project_path, &ptype, args, &envs, true, true)?;
+            build_on_windows(&project_path, &ptype, args, &envs)?;
         }
     }
 
@@ -413,6 +417,7 @@ pub fn cmd_build(args: &mut BuildArgs) -> Result<()> {
 }
 
 fn build_on_linux(
+    project_canonical: &Path,
     ptype: &ProjectType,
     args: &BuildArgs,
     envs: &[(&str, &str)],
@@ -428,12 +433,6 @@ fn build_on_linux(
     run_vagrant_streaming(&up_args, envs)?;
 
     // Attach transient shared folder for dynamic workspace mounting
-    let project_canonical = args
-        .project
-        .canonicalize()
-        .unwrap_or_else(|_| args.project.clone());
-
-    // Unmount any previous workspace inside guest cleanly
     let _ = run_vagrant_streaming(
         &[
             "ssh",
@@ -475,8 +474,8 @@ fn build_on_linux(
         ""
     };
 
-    let ver_info = extract_project_version(&project_canonical);
-    let app_name = extract_project_name(&project_canonical);
+    let ver_info = extract_project_version(project_canonical);
+    let app_name = extract_project_name(project_canonical);
     let raw_ver = if !ver_info.raw.is_empty() {
         ver_info.raw.as_str()
     } else {
@@ -724,7 +723,7 @@ fn build_on_linux(
             _ => "echo '[dev-forge : macOS] Compilación de test para macOS omitida para este proyecto.';".to_string(),
         }
     } else if component == BuildComponent::Gui {
-        "echo '[dev-forge : macOS] Compilación de GUI para macOS omitida (solo CLI).';".to_string()
+        "echo '[dev-forge : macOS : AVISO] Los paquetes GUI nativos de macOS (.app/.dmg) requieren frameworks de Cocoa/WebKit y un entorno de compilación macOS nativo. Compilación GUI omitida.';".to_string()
     } else {
         match ptype {
             ProjectType::Rust | ProjectType::RustTauri => format!(
@@ -767,7 +766,10 @@ fn build_on_linux(
                         echo '[dev-forge : macOS] Generado: /workspace/dist/{app_name}-cli-darwin.aarch64 ({raw_ver})'; \
                         break; \
                     fi; \
-                done;"
+                done; \
+                if [ \"{ptype:?}\" = \"RustTauri\" ]; then \
+                    echo '[dev-forge : macOS : INFO] Binarios CLI Mach-O compilados para macOS. Los instaladores GUI nativos (.dmg/.app) requieren un entorno macOS nativo con Cocoa/WebKit.'; \
+                fi;"
             ),
             ProjectType::Go => format!(
                 "echo '=== [dev-forge : macOS] Compilando binarios Go Darwin para {app_name} ==='; \
@@ -818,7 +820,12 @@ fn build_on_linux(
     Ok(())
 }
 
-fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]) -> Result<()> {
+fn build_on_windows(
+    project_canonical: &Path,
+    ptype: &ProjectType,
+    args: &BuildArgs,
+    envs: &[(&str, &str)],
+) -> Result<()> {
     ensure_mutual_exclusion("forge-windows")?;
     log_info("Preparando entorno de compilacion en 'forge-windows'...");
     let mut up_args = vec!["up", "forge-windows"];
@@ -828,11 +835,6 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
     run_vagrant_streaming(&up_args, envs)?;
 
     // Attach transient shared folder for dynamic workspace mounting
-    let project_canonical = args
-        .project
-        .canonicalize()
-        .unwrap_or_else(|_| args.project.clone());
-
     let _ = Command::new("VBoxManage")
         .args([
             "sharedfolder",
@@ -875,8 +877,8 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
         defender_bypass, clean_legacy, path_init, link_ps, clean_ps, cache_init
     );
 
-    let ver_info = extract_project_version(&project_canonical);
-    let app_name = extract_project_name(&project_canonical);
+    let ver_info = extract_project_version(project_canonical);
+    let app_name = extract_project_name(project_canonical);
     let raw_ver = if !ver_info.raw.is_empty() {
         ver_info.raw.as_str()
     } else {
@@ -957,11 +959,16 @@ fn build_on_windows(ptype: &ProjectType, args: &BuildArgs, envs: &[(&str, &str)]
                         "if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ cargo tauri build }} \
                         elseif (Get-Command npx.cmd -ErrorAction SilentlyContinue) {{ npx --yes @tauri-apps/cli build }} \
                         else {{ cargo build --release }}; \
-                        if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} \
-                        elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }} \
-                        elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force }}; \
+                        $guiFound = $false; \
+                        if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }} \
+                        elseif (Test-Path 'C:\\target\\release\\{app_name}-gui.exe') {{ Copy-Item 'C:\\target\\release\\{app_name}-gui.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }} \
+                        elseif (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe') {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }}; \
+                        if (-not $guiFound) {{ \
+                            $guiCandidate = Get-ChildItem -Path @('C:\\target\\release', 'src-tauri\\target\\release', 'target\\release') -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -notmatch '[\\\\/](deps|build|incremental|examples)[\\\\/]' -and $_.Name -notmatch '(?i)(cargo|rustc|-cli-|^vc_)' -and $_.Name -ne '{app_name}-cli-windows.x86_64.exe' }} | Select-Object -First 1; \
+                            if ($guiCandidate) {{ Copy-Item $guiCandidate.FullName 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; $guiFound = $true }}; \
+                        }}; \
                         if (Test-Path 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe') {{ Copy-Item 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-gui-{raw_ver}-windows.x86_64.exe' -Force }}; \
-                        if (Test-Path src-tauri\\target\\release\\bundle) {{ Copy-Item -Recurse src-tauri\\target\\release\\bundle\\* C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }}; "
+                        @('src-tauri\\target\\release\\bundle', 'target\\release\\bundle', 'C:\\target\\release\\bundle') | ForEach-Object {{ if (Test-Path $_) {{ Copy-Item -Recurse \"$_\\*\" C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }} }}; "
                     )
                 } else {
                     "".to_string()

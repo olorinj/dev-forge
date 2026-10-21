@@ -56,8 +56,19 @@ flowchart LR
 
 ### Preparación del CLI
 
+#### Instalación Automática en `~/.local/bin` (Recomendada):
+Ejecuta el auto-dimensionamiento del host o el comando de instalación de binario:
+```bash
+# Auto-detecta recursos e instala el ejecutable dev-forge en ~/.local/bin/dev-forge
+dev-forge tune
+
+# O alternativamente:
+dev-forge install-bin
+```
+Asegúrate de que `~/.local/bin` forme parte de tu `$PATH` (estándar en la mayoría de distribuciones modernas). Una vez hecho, podrás invocar `dev-forge` directamente desde cualquier terminal y desde cualquier directorio.
+
 #### En Linux y macOS (Bash / Zsh):
-Añade `dev-forge` a tu `PATH` o crea un alias en tu archivo de configuración (`~/.bashrc` o `~/.zshrc`):
+También puedes añadir la carpeta `bin/` al `PATH` o definir un alias:
 ```bash
 # Añadir al PATH permanentemente
 export PATH="/home/usuario/DEV/dev-forge/bin:$PATH"
@@ -94,19 +105,35 @@ El orquestador ofrece paridad total de comandos en ambos shells:
 
 ### 1. Compilar cualquier proyecto
 
-#### En Linux / macOS (Bash / Zsh):
+#### Menú Interactivo Guiado (Por Defecto):
+Si ejecutas `dev-forge build` sin parámetros, el orquestador inicia un asistente interactivo en terminal para guiarte en 4 pasos:
+1. **Selección de Proyecto**: Si te encuentras en un proyecto, lo selecciona automáticamente; si estás en un directorio neutro, te permite elegir entre los últimos 5 proyectos usados o introducir una ruta manual (con soporte para `~`).
+2. **Componente**: Todos (CLI + GUI), solo CLI, solo aplicación GUI o ejecutables de prueba (`test runners`).
+3. **Destino (Target OS)**: Todos (Linux, Windows, macOS), solo Linux, solo Windows o solo macOS.
+4. **Formato de Salida**: Binarios directos + Paquetes/Instaladores (AppImage, deb, rpm, MSI, Inno Setup), solo binarios o solo paquetes.
+5. **Modo**: Release (optimizado) o Testing / Debug.
+
+```bash
+# Lanzar asistente interactivo
+dev-forge build
+```
+
+#### Modo No Interactivo (Flags Directos):
 ```bash
 # Compilar proyecto en Rust o Tauri hacia todos los destinos
-dev-forge build --project /ruta/a/mi-proyecto --target all
+dev-forge build -p /ruta/a/mi-proyecto -t all
+
+# Compilar solo la aplicación GUI de escritorio hacia Windows
+dev-forge build -p /ruta/a/mi-proyecto -t windows --component gui
+
+# Compilar solo ejecutables para pruebas / test suite en Linux
+dev-forge build -p /ruta/a/mi-proyecto -t linux --test
 
 # Compilar proyecto en Java (JAR)
-dev-forge build --project /ruta/a/mi-app-java --target linux
+dev-forge build -p /ruta/a/mi-app-java -t linux
 
-# Compilar script Python en un ejecutable Windows PE32+ (PyInstaller)
-dev-forge build --project /ruta/a/mi-script --target windows
-
-# Compilar script Python con Nuitka (Ahead-of-Time C nativo, mitigación EDR/Antivirus)
-dev-forge build --project /ruta/a/mi-script --target windows --compiler nuitka
+# Compilar script Python en ejecutable Windows con Nuitka (C nativo)
+dev-forge build -p /ruta/a/mi-script -t windows --compiler nuitka
 ```
 
 #### En Windows (PowerShell):

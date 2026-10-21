@@ -142,6 +142,19 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
   - Transpila el código fuente Python a código C nativo y lo compila con GCC (Linux) o MSVC (Windows).
   - Produce ejecutables totalmente autónomos (`--standalone --onefile`) de arranque instantáneo y resistentes a bloqueos heurísticos.
 
+### 4.10 Descubrimiento Dinámico de Ejecutables GUI y Recolección Multi-Directorio en Windows
+- En proyectos de interfaz de usuario de escritorio basados en Tauri (Tauri v1 y v2), el ejecutable final en Windows adopta el nombre especificado en `productName` de `tauri.conf.json` (por ejemplo, `LexiShield.exe`), el cual difiere comúnmente del nombre del crate en `src-tauri/Cargo.toml` (`lexishield-gui`).
+- Para eliminar la fragilidad de nombres cableados, `dev-forge` implementa un motor de búsqueda dinámica en PowerShell:
+  - Inspecciona las rutas candidatas (`C:\target\release`, `src-tauri\target\release`, `target\release`), filtrando ejecutables que no correspondan a dependencias intermedias (`deps`, `build`, `incremental`) ni al CLI.
+  - Genera las copias canónicas (`<app>-gui-windows.x86_64.exe`) y versionadas (`<app>-gui-<version>-windows.x86_64.exe`).
+  - Recolecta automáticamente los instaladores y paquetes producidos por Tauri en cualquiera de las tres posibles ubicaciones de bundle hacia `/workspace/dist/`.
+
+### 4.11 Aislamiento de Entorno Vagrant y Operación Fuera del Árbol (`VAGRANT_DOTFILE_PATH`)
+- Cuando `dev-forge` se ejecuta desde cualquier directorio del sistema host (fuera del repositorio de la forja), Vagrant podría intentar buscar o crear su directorio de estado `.vagrant/` dentro del directorio de trabajo actual del cliente.
+- `dev-forge` previene esto forzando en todas sus llamadas:
+  - `VAGRANT_CWD`: Apunta permanentemente a la ruta canónica de la forja.
+  - `VAGRANT_DOTFILE_PATH`: Apunta estrictamente a `<forge-root>/.vagrant`, asegurando que el estado de las máquinas virtuales sea compartido globalmente y que jamás se contamine el repositorio del usuario.
+
 ---
 
 ## 5. Ergonomía del Entorno y Estabilidad Operativa
@@ -176,6 +189,12 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
   - Extrae automáticamente la configuración SSH activa de la máquina virtual (`vagrant ssh-config`).
   - Genera dentro del proyecto la carpeta `.vscode/` con `launch.json`, `tasks.json`, `settings.json` y recomendaciones de extensiones adaptadas al lenguaje (`rust`, `python`, `go`, `java`, `c`).
   - Permite abrir VS Code y conectarse transparentemente a `forge-linux` usando la extensión *Remote - SSH*.
+
+### 5.5 Ergonomía Global del CLI y Selección Interactiva de Proyectos
+- **Instalación no intrusiva en `~/.local/bin`**: El comando `dev-forge install-bin` (invocado también de forma transparente durante `dev-forge tune`) genera un enlace simbólico en el directorio estándar de usuario `~/.local/bin/dev-forge`, permitiendo que el comando esté disponible de forma global en cualquier terminal sin requerir elevación de privilegios `root` ni contaminar `/usr/local/bin`.
+- **Asistente Inteligente de Selección de Proyectos**:
+  - Al ejecutar `dev-forge build` sin indicar explícitamente el flag `--project` / `-p`, el asistente verifica si el directorio de trabajo actual contiene un manifiesto de desarrollo válido (`Cargo.toml`, `pyproject.toml`, `CMakeLists.txt`, `go.mod`, etc.).
+  - Si se ejecuta desde un directorio neutro (por ejemplo `~` o `/tmp`), presenta un selector interactivo con los últimos 5 proyectos utilizados (persistidos en `~/.dev-forge/recent_projects.json`) y la posibilidad de ingresar una ruta manual con soporte nativo para expansión de tilde `~`.
 
 
 

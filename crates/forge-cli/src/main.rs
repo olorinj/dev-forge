@@ -91,7 +91,22 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                 "Perfil .env sincronizado en:   {}",
                 config::get_env_path().display().to_string().bold()
             ));
+
+            if let Ok(bin_path) = config::install_local_bin() {
+                log_ok(&format!(
+                    "Acceso global configurado en: {}",
+                    bin_path.display().to_string().bold()
+                ));
+            }
+
             log_ok("El entorno dev-forge está listo para compilar con rendimiento óptimo.");
+        }
+        Commands::InstallBin => {
+            let bin_path = config::install_local_bin()?;
+            log_ok(&format!(
+                "dev-forge instalado con éxito para acceso global en: {}",
+                bin_path.display().to_string().bold()
+            ));
         }
         Commands::Status => {
             vagrant::cmd_status()?;

@@ -5,6 +5,75 @@ use std::io::{self, Write};
 /// Prompts an interactive terminal menu allowing the user to select
 /// Component, Target OS, Packaging format, and Build Profile.
 pub fn prompt_menu(args: &mut BuildArgs) -> io::Result<()> {
+    // 0. Project Selection if None or not provided
+    if args.project.is_none() {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let detected_here = crate::project::detect_project_type(&cwd);
+        if detected_here != crate::project::ProjectType::Generic {
+            args.project = Some(cwd);
+        } else {
+            let recents = crate::config::load_recent_projects();
+            if !recents.is_empty() {
+                println!(
+                    "\n{}",
+                    "? [0/4] Seleccione el proyecto a compilar:".yellow().bold()
+                );
+                let mut opt_idx = 1;
+                for r in &recents {
+                    let default_tag = if opt_idx == 1 {
+                        " [Último usado]".dimmed()
+                    } else {
+                        "".dimmed()
+                    };
+                    println!(
+                        "  [{}] {} {}",
+                        opt_idx,
+                        r.display().to_string().bold(),
+                        default_tag
+                    );
+                    opt_idx += 1;
+                }
+                println!("  [{}] Introducir ruta manual...", opt_idx);
+                print!(
+                    "{}",
+                    format!("Opción [1-{}] (Intro para opción 1): ", opt_idx).bold()
+                );
+                io::stdout().flush()?;
+
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                let trimmed = input.trim();
+                let chosen_num: usize = trimmed.parse().unwrap_or(1);
+                if chosen_num >= 1 && chosen_num <= recents.len() {
+                    args.project = Some(recents[chosen_num - 1].clone());
+                } else {
+                    print!("{}", "Introduzca la ruta del proyecto: ".bold());
+                    io::stdout().flush()?;
+                    let mut manual_input = String::new();
+                    io::stdin().read_line(&mut manual_input)?;
+                    args.project = Some(crate::config::expand_path(manual_input.trim()));
+                }
+            } else {
+                print!(
+                    "{}",
+                    "? Introduzca la ruta del proyecto a compilar: "
+                        .yellow()
+                        .bold()
+                );
+                io::stdout().flush()?;
+                let mut manual_input = String::new();
+                io::stdin().read_line(&mut manual_input)?;
+                args.project = Some(crate::config::expand_path(manual_input.trim()));
+            }
+        }
+    }
+
+    let proj_display = args
+        .project
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| ".".to_string());
+
     println!(
         "\n{}",
         "================================================================".cyan()
@@ -19,10 +88,7 @@ pub fn prompt_menu(args: &mut BuildArgs) -> io::Result<()> {
         "{}",
         "================================================================".cyan()
     );
-    println!(
-        "Proyecto a procesar: {}",
-        args.project.display().to_string().bold()
-    );
+    println!("Proyecto a procesar: {}", proj_display.bold());
 
     // 1. Component Selection
     if args.component.is_none() && !args.test {

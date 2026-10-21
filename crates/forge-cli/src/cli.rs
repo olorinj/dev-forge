@@ -83,6 +83,9 @@ pub enum Commands {
     /// Open VS Code Remote-SSH session inside VM with development profile
     Ide(IdeArgs),
 
+    /// Install dev-forge binary into ~/.local/bin for global execution
+    InstallBin,
+
     /// Generate native shell completion scripts
     Completions {
         /// Shell type
@@ -93,9 +96,9 @@ pub enum Commands {
 
 #[derive(Args, Debug, Clone)]
 pub struct BuildArgs {
-    /// Path to the client project to compile (mandatory)
+    /// Path to the client project to compile (optional, defaults to current directory or recent selector)
     #[arg(short, long)]
-    pub project: PathBuf,
+    pub project: Option<PathBuf>,
 
     /// Target destination platform (linux | windows | macos | all)
     #[arg(short, long)]
