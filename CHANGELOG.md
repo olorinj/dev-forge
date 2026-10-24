@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Instaladores Universales en 1 Línea (`install.sh` e `install.ps1`)**:
+  - Instalación desatendida multiplataforma mediante `curl | bash` en Linux/macOS e `irm | iex` en Windows PowerShell.
+  - Auto-detección de arquitecturas (`x86_64` y `aarch64` Apple Silicon).
+  - Configuración automática del `$PATH` de usuario en `.bashrc`, `.zshrc` y en el Registro de Windows (`HKCU\Environment\Path`) sin requerir privilegios de administrador.
+  - Generación de wrappers auxiliares (`dev-forge.cmd`) para interoperabilidad inmediata en cualquier terminal de Windows.
+- **Workflow de Release Multiplataforma (`.github/workflows/release.yml`)**:
+  - Compilación automatizada de binarios nativos independientes para `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `x86_64-apple-darwin` y `aarch64-apple-darwin` con empaquetado comprimido y checksums SHA-256.
+
+### Fixed
+- **Protección Anti-Bloqueo en Invocaciones de VirtualBox**:
+  - Inyección de salvaguardas con timeout (2 segundos) en consultas a `VBoxManage` (`doctor`, `hardware` y `vagrant`) para evitar bloqueos indefinidos en entornos donde el daemon VBoxSVC no responde o está aislado.
+- **Detección Segura de Carpeta Almacén de Máquinas Virtuales**:
+  - Filtrado estricto de puntos de montaje de sistema (`/bin`, `/boot`, `/etc`, `/usr`, `/var`, etc.) en `detect_optimal_vbox_folder()` para garantizar que la carpeta de almacenamiento de VMs recaiga siempre en rutas de usuario seguras o particiones de datos válidas.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added

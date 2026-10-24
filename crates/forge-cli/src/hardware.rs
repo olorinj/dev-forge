@@ -78,8 +78,9 @@ pub fn detect_optimal_vbox_folder() -> String {
     // Check for explicit NVMe dedicated partition on Linux
     if cfg!(target_os = "linux") && Path::new("/mnt/data").is_dir() {
         let vdir = Path::new("/mnt/data/virtualbox");
-        let _ = std::fs::create_dir_all(vdir);
-        return vdir.to_string_lossy().to_string();
+        if std::fs::create_dir_all(vdir).is_ok() {
+            return vdir.to_string_lossy().to_string();
+        }
     }
 
     let disks = Disks::new_with_refreshed_list();
@@ -87,23 +88,37 @@ pub fn detect_optimal_vbox_folder() -> String {
 
     let mut best_mount: Option<String> = None;
     let mut max_free: u64 = 0;
+    let sys_mounts = [
+        "/bin", "/boot", "/dev", "/etc", "/lib", "/proc", "/root", "/run", "/sbin", "/sys", "/usr",
+        "/var",
+    ];
 
     for disk in disks.list() {
+        let mount_str = disk.mount_point().to_string_lossy().to_string();
+        if sys_mounts
+            .iter()
+            .any(|&s| mount_str == s || mount_str.starts_with(&format!("{}/", s)))
+        {
+            continue;
+        }
         let available = disk.available_space();
         if available > min_free_bytes && available > max_free {
             max_free = available;
-            best_mount = Some(disk.mount_point().to_string_lossy().to_string());
+            best_mount = Some(mount_str);
         }
     }
 
     if let Some(mount) = best_mount {
-        let target = Path::new(&mount).join(if cfg!(target_os = "windows") {
-            "VirtualBox VMs"
-        } else {
-            "virtualbox"
-        });
-        let _ = std::fs::create_dir_all(&target);
-        return target.to_string_lossy().to_string();
+        if mount != "/" {
+            let target = Path::new(&mount).join(if cfg!(target_os = "windows") {
+                "VirtualBox VMs"
+            } else {
+                "virtualbox"
+            });
+            if std::fs::create_dir_all(&target).is_ok() {
+                return target.to_string_lossy().to_string();
+            }
+        }
     }
 
     // Default home fallback
@@ -125,6 +140,12 @@ pub fn detect_optimal_vbox_folder() -> String {
 }
 
 fn apply_vbox_machinefolder(folder: &str) {
+    #[cfg(unix)]
+    let _ = Command::new("timeout")
+        .args(["2", "VBoxManage", "setproperty", "machinefolder", folder])
+        .output();
+
+    #[cfg(not(unix))]
     let _ = Command::new("VBoxManage")
         .args(["setproperty", "machinefolder", folder])
         .output();

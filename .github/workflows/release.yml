@@ -1,0 +1,73 @@
+name: Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: dev-forge
+            asset_name: dev-forge-x86_64-unknown-linux-gnu.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: dev-forge.exe
+            asset_name: dev-forge-x86_64-pc-windows-msvc.zip
+          - os: macos-13
+            target: x86_64-apple-darwin
+            artifact_name: dev-forge
+            asset_name: dev-forge-x86_64-apple-darwin.tar.gz
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact_name: dev-forge
+            asset_name: dev-forge-aarch64-apple-darwin.tar.gz
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build native release binary
+        run: cargo build --release --bin dev-forge --target ${{ matrix.target }}
+
+      - name: Package Linux / macOS archive
+        if: runner.os != 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ../../../${{ matrix.asset_name }} ${{ matrix.artifact_name }}
+          cd ../../..
+          shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+
+      - name: Package Windows archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path target/${{ matrix.target }}/release/${{ matrix.artifact_name }} -DestinationPath ${{ matrix.asset_name }}
+          $hash = (Get-FileHash -Path ${{ matrix.asset_name }} -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ matrix.asset_name }}" | Out-File -FilePath "${{ matrix.asset_name }}.sha256" -Encoding ascii
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ${{ matrix.asset_name }}
+            ${{ matrix.asset_name }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -177,30 +177,61 @@ def expand_path(raw: str | Path) -> Path:
 
 
 def install_local_bin() -> Path:
-    """Install or symlink dev-forge into ~/.local/bin."""
-    local_bin = Path.home() / ".local" / "bin"
-    local_bin.mkdir(parents=True, exist_ok=True)
-
-    target_symlink = local_bin / "dev-forge"
-
-    # Locate source binary or python entrypoint
-    forge_root = Path(__file__).resolve().parent.parent
-    rust_release = forge_root / "target" / "release" / "dev-forge"
-    rust_debug = forge_root / "target" / "debug" / "dev-forge"
-
-    if rust_release.is_file():
-        source_bin = rust_release
-    elif rust_debug.is_file():
-        source_bin = rust_debug
-    else:
-        # Fallback to dev-forge runner script
-        source_bin = forge_root / "dev-forge"
-
+    """Install or symlink dev-forge into local bin."""
     if os.name == "nt":
         import shutil
-        shutil.copy2(source_bin, target_symlink.with_suffix(".exe"))
-        return target_symlink.with_suffix(".exe")
+        import subprocess
+
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            local_bin = Path(local_app_data) / "Programs" / "dev-forge" / "bin"
+        else:
+            local_bin = Path.home() / ".dev-forge" / "bin"
+        local_bin.mkdir(parents=True, exist_ok=True)
+        target_exe = local_bin / "dev-forge.exe"
+
+        forge_root = Path(__file__).resolve().parent.parent
+        rust_release = forge_root / "target" / "release" / "dev-forge.exe"
+        if not rust_release.is_file():
+            rust_release = forge_root / "target" / "release" / "dev-forge"
+
+        if rust_release.is_file():
+            shutil.copy2(rust_release, target_exe)
+        elif (forge_root / "bin" / "dev-forge.cmd").is_file():
+            shutil.copy2(forge_root / "bin" / "dev-forge.cmd", local_bin / "dev-forge.cmd")
+
+        cmd_path = local_bin / "dev-forge.cmd"
+        cmd_path.write_text("@echo off\r\n\"%~dp0dev-forge.exe\" %*\r\n", encoding="utf-8")
+
+        dir_str = str(local_bin)
+        ps_code = (
+            f"$dir='{dir_str}'; $p=[Environment]::GetEnvironmentVariable('Path', 'User'); "
+            "if (-not ($p -split ';' -contains $dir)) { "
+            "[Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';' + $dir), 'User') }"
+        )
+        try:
+            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_code], capture_output=True)
+        except Exception:
+            pass
+
+        return target_exe
     else:
+        local_bin = Path.home() / ".local" / "bin"
+        local_bin.mkdir(parents=True, exist_ok=True)
+        target_symlink = local_bin / "dev-forge"
+
+        # Locate source binary or python entrypoint
+        forge_root = Path(__file__).resolve().parent.parent
+        rust_release = forge_root / "target" / "release" / "dev-forge"
+        rust_debug = forge_root / "target" / "debug" / "dev-forge"
+
+        if rust_release.is_file():
+            source_bin = rust_release
+        elif rust_debug.is_file():
+            source_bin = rust_debug
+        else:
+            source_bin = forge_root / "dev-forge"
+
         if target_symlink.is_symlink() or target_symlink.is_file():
             target_symlink.unlink(missing_ok=True)
         target_symlink.symlink_to(source_bin.resolve())

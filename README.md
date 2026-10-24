@@ -56,16 +56,40 @@ flowchart LR
 
 ### Preparación del CLI
 
-#### Instalación Automática en `~/.local/bin` (Recomendada):
-Ejecuta el auto-dimensionamiento del host o el comando de instalación de binario:
+#### Instalación Universal en 1 Línea (Recomendada):
+
+##### En Linux y macOS (Bash / Zsh):
 ```bash
-# Auto-detecta recursos e instala el ejecutable dev-forge en ~/.local/bin/dev-forge
+curl -fsSL https://raw.githubusercontent.com/olorinj/dev-forge/main/install.sh | bash
+```
+> El instalador detecta la arquitectura de tu procesador (Intel/AMD x86_64 o Apple Silicon aarch64), instala el binario en `~/.local/bin`, configura automáticamente el `$PATH` en tu archivo de inicio (`~/.bashrc` o `~/.zshrc`), ejecuta `dev-forge tune` para dimensionar las VMs a tu hardware y realiza el diagnóstico pre-vuelo con `dev-forge doctor`.
+
+##### En Windows (PowerShell 5.1 / 7+):
+```powershell
+irm https://raw.githubusercontent.com/olorinj/dev-forge/main/install.ps1 | iex
+```
+> El script descarga o compila `dev-forge.exe`, lo instala en `%LOCALAPPDATA%\Programs\dev-forge\bin`, genera el wrapper `dev-forge.cmd`, actualiza de forma permanente el `PATH` del usuario en el Registro de Windows (sin requerir permisos de administrador) y ejecuta el dimensionamiento automático.
+
+---
+
+#### Instalación desde Repositorio Clonado:
+Si has clonado el repositorio localmente, puedes ejecutar el instalador directo:
+```bash
+# En Linux / macOS:
+./install.sh
+
+# En Windows (PowerShell):
+.\install.ps1
+```
+
+O utilizar el auto-dimensionamiento del host mediante `install-bin`:
+```bash
+# Auto-detecta recursos e instala el ejecutable dev-forge
 dev-forge tune
 
 # O alternativamente:
 dev-forge install-bin
 ```
-Asegúrate de que `~/.local/bin` forme parte de tu `$PATH` (estándar en la mayoría de distribuciones modernas). Una vez hecho, podrás invocar `dev-forge` directamente desde cualquier terminal y desde cualquier directorio.
 
 #### En Linux y macOS (Bash / Zsh):
 También puedes añadir la carpeta `bin/` al `PATH` o definir un alias:

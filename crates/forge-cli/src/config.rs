@@ -339,33 +339,68 @@ pub fn expand_path(raw: &str) -> PathBuf {
 }
 
 pub fn install_local_bin() -> Result<PathBuf> {
-    let local_bin = if let Some(user_dirs) = directories::UserDirs::new() {
-        user_dirs.home_dir().join(".local").join("bin")
-    } else {
-        PathBuf::from("/usr/local/bin")
-    };
-    std::fs::create_dir_all(&local_bin)?;
-
-    let target_symlink = local_bin.join("dev-forge");
-    let current_exe = std::env::current_exe()?;
-    let canonical_exe = current_exe.canonicalize().unwrap_or(current_exe);
-
     #[cfg(unix)]
     {
+        let local_bin = if let Some(user_dirs) = directories::UserDirs::new() {
+            user_dirs.home_dir().join(".local").join("bin")
+        } else {
+            PathBuf::from("/usr/local/bin")
+        };
+        std::fs::create_dir_all(&local_bin)?;
+
+        let target_symlink = local_bin.join("dev-forge");
+        let current_exe = std::env::current_exe()?;
+        let canonical_exe = current_exe.canonicalize().unwrap_or(current_exe);
+
         use std::os::unix::fs::symlink;
         if target_symlink.is_file() || target_symlink.is_symlink() {
             let _ = std::fs::remove_file(&target_symlink);
         }
         symlink(&canonical_exe, &target_symlink)
             .with_context(|| format!("No se pudo crear symlink en {:?}", target_symlink))?;
+
+        Ok(target_symlink)
     }
 
     #[cfg(windows)]
     {
-        std::fs::copy(&canonical_exe, &target_symlink)?;
-    }
+        let local_bin = if let Some(base_dirs) = directories::BaseDirs::new() {
+            base_dirs
+                .data_local_dir()
+                .join("Programs")
+                .join("dev-forge")
+                .join("bin")
+        } else if let Some(user_dirs) = directories::UserDirs::new() {
+            user_dirs.home_dir().join(".dev-forge").join("bin")
+        } else {
+            PathBuf::from("C:\\dev-forge\\bin")
+        };
+        std::fs::create_dir_all(&local_bin)?;
 
-    Ok(target_symlink)
+        let target_exe = local_bin.join("dev-forge.exe");
+        let current_exe = std::env::current_exe()?;
+        let canonical_exe = current_exe.canonicalize().unwrap_or(current_exe);
+
+        std::fs::copy(&canonical_exe, &target_exe)
+            .with_context(|| format!("No se pudo copiar dev-forge.exe en {:?}", target_exe))?;
+
+        // Wrapper CMD para ejecucion directa en cualquier consola de Windows
+        let cmd_path = local_bin.join("dev-forge.cmd");
+        let cmd_script = "@echo off\r\n\"%~dp0dev-forge.exe\" %*\r\n";
+        let _ = std::fs::write(&cmd_path, cmd_script);
+
+        // Registro permanente en el PATH de usuario
+        let dir_str = local_bin.to_string_lossy().to_string();
+        let ps_code = format!(
+            "$dir='{}'; $p=[Environment]::GetEnvironmentVariable('Path', 'User'); if (-not ($p -split ';' -contains $dir)) {{ [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';' + $dir), 'User') }}",
+            dir_str
+        );
+        let _ = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_code])
+            .output();
+
+        Ok(target_exe)
+    }
 }
 
 #[cfg(test)]

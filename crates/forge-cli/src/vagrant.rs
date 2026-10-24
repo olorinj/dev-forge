@@ -103,10 +103,17 @@ pub fn ensure_mutual_exclusion(target_machine: &str) -> Result<()> {
         "FORGE-WINDOWS"
     };
 
-    if let Ok(out) = Command::new("VBoxManage")
-        .args(["list", "runningvms"])
-        .output()
-    {
+    let out_res = if cfg!(unix) {
+        Command::new("timeout")
+            .args(["2", "VBoxManage", "list", "runningvms"])
+            .output()
+    } else {
+        Command::new("VBoxManage")
+            .args(["list", "runningvms"])
+            .output()
+    };
+
+    if let Ok(out) = out_res {
         let stdout = String::from_utf8_lossy(&out.stdout);
         if stdout.contains(sibling_vbox_name) || stdout.contains(sibling) {
             log_warn(&format!(

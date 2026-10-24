@@ -435,27 +435,41 @@ fn check_vm_and_cache_status(report: &mut DoctorReport) {
 }
 
 fn get_running_vms() -> Vec<String> {
-    let out = Command::new("VBoxManage")
-        .args(["list", "runningvms"])
-        .output();
-    if let Ok(o) = out {
-        String::from_utf8_lossy(&o.stdout)
-            .lines()
-            .map(|l| l.to_string())
-            .collect()
+    let out = if cfg!(unix) {
+        Command::new("timeout")
+            .args(["2", "VBoxManage", "list", "runningvms"])
+            .output()
     } else {
-        Vec::new()
+        Command::new("VBoxManage")
+            .args(["list", "runningvms"])
+            .output()
+    };
+    if let Ok(o) = out {
+        if o.status.success() {
+            return String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(|l| l.to_string())
+                .collect();
+        }
     }
+    Vec::new()
 }
 
 fn get_registered_vms() -> Vec<String> {
-    let out = Command::new("VBoxManage").args(["list", "vms"]).output();
-    if let Ok(o) = out {
-        String::from_utf8_lossy(&o.stdout)
-            .lines()
-            .map(|l| l.to_string())
-            .collect()
+    let out = if cfg!(unix) {
+        Command::new("timeout")
+            .args(["2", "VBoxManage", "list", "vms"])
+            .output()
     } else {
-        Vec::new()
+        Command::new("VBoxManage").args(["list", "vms"]).output()
+    };
+    if let Ok(o) = out {
+        if o.status.success() {
+            return String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(|l| l.to_string())
+                .collect();
+        }
     }
+    Vec::new()
 }
