@@ -1,0 +1,50 @@
+# ==============================================================================
+# DevForge - Agent Scope & Orchestration Manifest (.agent-scope.toml)
+# ==============================================================================
+
+[project]
+id = "dev-forge"
+name = "DevForge"
+version = "0.2.0"
+domain = "Multi-Toolchain Build & Virtualization Orchestrator"
+
+[stacks]
+languages = [
+    "rust",
+    "python"
+]
+frameworks = [
+    "tauri",
+    "vagrant",
+    "virtualbox"
+]
+
+[agents.common]
+enabled = [
+    "quality-gate-auditor",
+    "security-auditor",
+    "qa-fuzzer",
+    "research"
+]
+
+[agents.stacks]
+enabled = [
+    "tauri-ui-specialist",
+    "native-packager"
+]
+
+[agents.project]
+dedicated = [
+    "vagrant-architect"
+]
+
+denied = [
+    "lexishield:*",
+    "academia:*",
+    "corrector-docx:*"
+]
+
+[triggers]
+quality_gate_on_commit = true
+quality_gate_file_threshold = 3
+compiler_line_threshold = 20
