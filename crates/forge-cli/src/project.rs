@@ -265,9 +265,42 @@ pub fn extract_project_version(path: &Path) -> ProjectVersionInfo {
         }
     }
 
-    let raw = raw_version.unwrap_or_else(|| "0.1.0".to_string());
-
     let (branch, commit) = extract_git_info(path);
+
+    let branch_clean = branch
+        .trim_start_matches("feature/")
+        .trim_start_matches("bugfix/")
+        .trim_start_matches("release/")
+        .trim_start_matches("hotfix/")
+        .trim_start_matches('v');
+
+    let detected_branch_ver = if !branch_clean.is_empty()
+        && branch_clean
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == '-' || c.is_ascii_alphabetic())
+        && branch_clean.contains('.')
+        && branch_clean
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_digit())
+    {
+        Some(branch_clean.to_string())
+    } else {
+        None
+    };
+
+    let raw = match (raw_version, detected_branch_ver) {
+        (Some(file_ver), Some(branch_ver)) => {
+            if file_ver == "0.1.0" {
+                branch_ver
+            } else {
+                file_ver
+            }
+        }
+        (Some(file_ver), None) => file_ver,
+        (None, Some(branch_ver)) => branch_ver,
+        (None, None) => "0.1.0".to_string(),
+    };
 
     let safe_branch = branch.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "-");
     let display = if !safe_branch.is_empty() && safe_branch != "HEAD" {
@@ -522,6 +555,14 @@ mod tests {
         let ver = extract_project_version(tmp.path());
         assert_eq!(ver.raw, "0.4.2");
         assert_eq!(ver.wix, "0.4.2");
+    }
+
+    #[test]
+    fn test_extract_project_version_default_fallback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ver = extract_project_version(tmp.path());
+        assert_eq!(ver.raw, "0.1.0");
+        assert_eq!(ver.wix, "0.1.0");
     }
 
     #[test]

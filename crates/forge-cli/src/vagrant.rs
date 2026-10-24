@@ -734,21 +734,24 @@ fn build_on_linux(
                 elif [ -f /workspace/Dockerfile.osxcross ]; then \
                     OSXCROSS_DOCKER='/workspace/Dockerfile.osxcross'; \
                 else \
-                    OSXCROSS_DOCKER=''; \
+                    mkdir -p /tmp/osxcross-build && cat << 'EOF_DOCKER' > /tmp/osxcross-build/Dockerfile\n\
+FROM crazymax/osxcross:latest-ubuntu AS osxcross\n\
+FROM rust:latest\n\
+RUN apt-get update && apt-get install -y --no-install-recommends clang llvm lld libc6-dev && rm -rf /var/lib/apt/lists/*\n\
+COPY --from=osxcross /osxcross /osxcross\n\
+RUN rustup target add x86_64-apple-darwin aarch64-apple-darwin\n\
+ENV PATH=\"/osxcross/bin:$PATH\" LD_LIBRARY_PATH=\"/osxcross/lib:$LD_LIBRARY_PATH\"\n\
+ENV CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER=o64-clang CC_x86_64_apple_darwin=o64-clang CXX_x86_64_apple_darwin=o64-clang++\n\
+ENV CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=oa64-clang CC_aarch64_apple_darwin=oa64-clang CXX_aarch64_apple_darwin=oa64-clang++\n\
+WORKDIR /src\n\
+EOF_DOCKER\n\
+                    OSXCROSS_DOCKER='/tmp/osxcross-build/Dockerfile'; \
                 fi; \
-                if [ -n \"$OSXCROSS_DOCKER\" ]; then \
-                    echo '[dev-forge : macOS] Compilando mediante contenedor osxcross ('\"$OSXCROSS_DOCKER\"')...'; \
-                    cd /workspace; \
-                    sudo docker build -t forge-osxcross -f \"$OSXCROSS_DOCKER\" . && \
-                    sudo docker run --rm -v /workspace:/src -v /tmp/cargo-target:/src/target forge-osxcross cargo build --target x86_64-apple-darwin --release || true; \
-                    sudo docker run --rm -v /workspace:/src -v /tmp/cargo-target:/src/target forge-osxcross cargo build --target aarch64-apple-darwin --release || true; \
-                else \
-                    echo '[dev-forge : macOS] Compilando con toolchain Rust hacia Darwin...'; \
-                    cd /workspace; \
-                    rustup target add x86_64-apple-darwin aarch64-apple-darwin 2>/dev/null || true; \
-                    CARGO_TARGET_DIR=/tmp/cargo-target cargo build --target x86_64-apple-darwin --release 2>/dev/null || true; \
-                    CARGO_TARGET_DIR=/tmp/cargo-target cargo build --target aarch64-apple-darwin --release 2>/dev/null || true; \
-                fi; \
+                echo '[dev-forge : macOS] Compilando mediante contenedor osxcross ('\"$OSXCROSS_DOCKER\"')...'; \
+                cd /workspace; \
+                sudo docker build -t forge-osxcross -f \"$OSXCROSS_DOCKER\" . && \
+                sudo docker run --rm -v /workspace:/src -v /tmp/cargo-target:/src/target forge-osxcross cargo build --target x86_64-apple-darwin --release || true; \
+                sudo docker run --rm -v /workspace:/src -v /tmp/cargo-target:/src/target forge-osxcross cargo build --target aarch64-apple-darwin --release || true; \
                 for f in '/tmp/cargo-target/x86_64-apple-darwin/release/{app_name}' '/workspace/target/x86_64-apple-darwin/release/{app_name}'; do \
                     if [ -f \"$f\" ]; then \
                         cp \"$f\" '/workspace/dist/{app_name}-cli-darwin.x86_64'; \
@@ -871,10 +874,12 @@ fn build_on_windows(
     let path_init =
         "$env:PATH = \"$env:USERPROFILE\\.cargo\\bin;C:\\Users\\vagrant\\.cargo\\bin;$env:PATH\"; ";
     let vs_shell_init = "if (Test-Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1') { & 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 | Out-Null }; ";
+    let mem_tuning =
+        "$env:CARGO_BUILD_JOBS = '1'; $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = '1'; ";
     let cache_init = "if (Test-Path C:\\forge-cache) { $env:CARGO_HOME='C:\\forge-cache\\cargo'; $env:GOMODCACHE='C:\\forge-cache\\go\\pkg\\mod'; $env:PIP_CACHE_DIR='C:\\forge-cache\\pip'; $env:GRADLE_USER_HOME='C:\\forge-cache\\gradle'; New-Item -ItemType Directory -Path C:\\forge-cache\\cargo, C:\\forge-cache\\go\\pkg\\mod, C:\\forge-cache\\pip, C:\\forge-cache\\gradle -Force | Out-Null }; ";
     let init_prefix = format!(
-        "{}{}{}{}{}{}",
-        defender_bypass, clean_legacy, path_init, link_ps, clean_ps, cache_init
+        "{}{}{}{}{}{}{}",
+        defender_bypass, clean_legacy, path_init, mem_tuning, link_ps, clean_ps, cache_init
     );
 
     let ver_info = extract_project_version(project_canonical);
@@ -1099,6 +1104,19 @@ fn build_on_windows(
         )
     };
     let full_cmd = format!("{}{}", build_ps, pack_ps);
+
+    log_info("Maximizando límites de memoria de la sesión WinRM en forge-windows (8192 MB)...");
+    let _ = run_vagrant_streaming(
+        &[
+            "winrm",
+            "forge-windows",
+            "-s",
+            "powershell",
+            "-c",
+            "Set-Item WSMan:\\localhost\\Shell\\MaxMemoryPerShellMB -Value 8192 -Force -ErrorAction SilentlyContinue",
+        ],
+        envs,
+    );
 
     log_info("Ejecutando proceso de compilacion remota en Windows Server Core...");
     let success = run_vagrant_streaming(
