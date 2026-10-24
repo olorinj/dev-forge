@@ -285,6 +285,7 @@ bash examples/hashforge/test.sh python windows
 Para consultar detalles de implementación, diagramas de arquitectura interna o guías específicas, revisa los documentos dedicados:
 
 - 📐 **[Arquitectura del Sistema y Flujo de Datos](docs/architecture.md)**
+- 🤖 **[Arquitectura de Subagentes Especializados y Flujo de Delegación](docs/subagents.md)**
 - 🍏 **[Compilación y Firmado de GUIs para macOS desde Linux](docs/macos-gui-compilation.md)**
 - 📖 **[Referencia de Lenguajes y Ecosistemas Soportados](docs/supported-languages.md)**
 - 📋 **[Registro de Cambios (Changelog)](CHANGELOG.md)**
