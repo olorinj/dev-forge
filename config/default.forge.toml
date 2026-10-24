@@ -9,6 +9,7 @@ mode = "offline" # "offline" (100% offline local) | "runner" (self-hosted)
 [virtualbox]
 gui_enabled = false
 keep_vms_running = false
+group = "/DEV-FORGE"
 
 [linux]
 name = "forge-linux"

@@ -116,6 +116,7 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--audio", "none"]
       vb.customize ["modifyvm", :id, "--vram", "16"]
       vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
+      vb.customize ["modifyvm", :id, "--groups", "/DEV-FORGE"]
     end
 
     # Aprovisionamiento declarativo e idempotente con Ansible
@@ -158,6 +159,7 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--audio", "none"]
       vb.customize ["modifyvm", :id, "--vram", "16"]
       vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
+      vb.customize ["modifyvm", :id, "--groups", "/DEV-FORGE"]
     end
 
     # Aprovisionamiento declarativo e idempotente con Ansible sobre WinRM
