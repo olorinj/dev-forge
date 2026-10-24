@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-24
+
+### Added
+- **Asistente Interactivo de Compilación en 4 Pasos (`dev-forge build`)**:
+  - Asistente guiado por consola con selección inteligente de proyecto (inspección de `$PWD` o historial MRU de los últimos 5 proyectos en `~/.dev-forge/recent_projects.json` con soporte de `~`), componente (CLI, GUI, All, Tests), destino (Linux, Windows, macOS, All), formato (binarios, instaladores o ambos) y perfil (Release vs Testing/Debug).
+- **Compilación de Artefactos de Prueba (`dev-forge build --test`)**:
+  - Soporte para compilar suites de prueba y test runners nativos de forma aislada en máquinas virtuales para validación headless.
+- **Convenio Universal de Nombres Versionados y Canónicos**:
+  - Salida dual en `dist/` depositando binarios canónicos (`<app>-<component>-<target>.<ext>`) y versionados (`<app>-<component>-<version>-<target>.<ext>`) en todas las plataformas.
+- **Ejecución Fuera del Árbol e Instalación de Usuario (`dev-forge install-bin`)**:
+  - Enlace simbólico o copia en `~/.local/bin/dev-forge` sin requerir `sudo`.
+  - Operación desacoplada desde cualquier ruta del host sin polución de directorios.
+- **Contenedorización Dinámica de macOS Cross-Compilation (`osxcross`)**:
+  - Fallback automático que genera y construye dinámicamente una imagen Docker basada en `crazymax/osxcross:latest-ubuntu` para compilar targets Darwin (`x86_64-apple-darwin` y `aarch64-apple-darwin`) en `forge-linux`.
+- **Elevación Automática de Cuota de Memoria WinRM (8192 MB)**:
+  - Configuración previa automática de `MaxMemoryPerShellMB = 8192` antes de ejecutar compilaciones complejas en Windows Server Core.
+- **Sincronización Automática de Versión desde Ramas Git**:
+  - Inferencia y propagación de versión semver a partir de ramas activas (`feature/v2.0.1` -> `2.0.1`) cuando el manifiesto del proyecto cliente carece de versión explícita.
+
+### Changed
+- **Aprovisionamiento Mínimo con Ansible**:
+  - Migración del aprovisionamiento de Vagrant hacia playbooks de Ansible optimizados y mínimos para reducir huella de memoria en VMs.
+- **Enrutamiento Multi-Crate para Aplicaciones de Escritorio (Tauri v2)**:
+  - Detección explícita de `src-tauri/Cargo.toml` para compilar exclusivamente con `--manifest-path src-tauri/Cargo.toml` al seleccionar componente GUI.
+
+### Fixed
+- **Bloqueos de `vboxsf` con Frontends Web (Vite / Esbuild) en Windows Guest**:
+  - Staging automático del código fuente web a almacenamiento volátil nativo (`$env:TEMP\build_ui`), compilación con `npm run build` y sincronización de artefactos compilados (`dist/`) de vuelta al workspace compartido.
+- **Conflicto de Recursos de Windows (`winres` vs `tauri-build`)**:
+  - Inyección de `$env:DISABLE_WINRES = '1'` y `$env:NO_STRIP = 'true'` en compilaciones de Tauri para Windows.
+- **Invariante Criptográfico Anti-Colisión (CLI vs GUI)**:
+  - Cálculo de hash SHA-256 del ejecutable CLI para verificar que ningún binario GUI cosechado coincida con el CLI. Detención inmediata con código de salida 1 ante ausencia de GUI real.
+- **Aislamiento de Estado de Vagrant (`VAGRANT_DOTFILE_PATH`)**:
+  - Exportación estricta de `VAGRANT_CWD` y `VAGRANT_DOTFILE_PATH` hacia la raíz de DevForge, resolviendo el error `The machine with the name 'forge-linux' was not found configured for this Vagrant environment` al ejecutar desde rutas externas.
+- **Agotamiento de Tmpfs y Sanitización de Ramas en Linuxdeploy**:
+  - Aplicación de `APPIMAGE_EXTRACT_AND_RUN=1` y `NO_STRIP=1` en AppImages de Linux y sanitización de caracteres en nombres de ramas.
+
 ## [0.1.0] - 2026-10-19
 
 ### Added

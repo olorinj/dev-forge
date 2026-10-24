@@ -155,6 +155,30 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
   - `VAGRANT_CWD`: Apunta permanentemente a la ruta canónica de la forja.
   - `VAGRANT_DOTFILE_PATH`: Apunta estrictamente a `<forge-root>/.vagrant`, asegurando que el estado de las máquinas virtuales sea compartido globalmente y que jamás se contamine el repositorio del usuario.
 
+### 4.12 Staging Efímero de Frontends en Windows Guests (`$env:TEMP\build_ui`)
+- Las carpetas compartidas de VirtualBox (`vboxsf` en Windows: `\\VBoxSvr\workspace`) sufren fallos graves de concurrencia, permisos de sockets y enlaces simbólicos cuando empaquetadores basados en Node (como Vite, esbuild o Rollup) ejecutan `npm run build`.
+- Para garantizar compilaciones deterministas de aplicaciones web embebidas (ej. interfaces de Tauri), `dev-forge`:
+  1. Clona el directorio del frontend (`ui/` o `frontend/`) a almacenamiento volátil nativo del guest (`$env:TEMP\build_ui`).
+  2. Ejecuta `npm run build` en el disco local rápido.
+  3. Sincroniza la carpeta compilada resultante (`dist/`) de vuelta al workspace compartido antes de que `cargo` o el compilador anfitrión ensamble el binario final.
+- Durante la compilación de GUIs de Tauri en Windows se exporta `$env:DISABLE_WINRES = '1'` para evitar conflictos de símbolos duplicados entre bibliotecas de terceros y `tauri-build`.
+
+### 4.13 Invariante Criptográfico Anti-Colisión (CLI vs GUI por Hash SHA-256)
+- En proyectos que combinan CLI y GUI en el mismo repositorio (arquitectura multi-crate como Tauri v2), una recolección heurística de ejecutables `.exe` puede capturar accidentalmente el binario CLI y renombrarlo como GUI, generando ejecutables que abren una consola y terminan de inmediato.
+- `dev-forge` aplica un invariante criptográfico estricto:
+  1. Calcula el hash SHA-256 del binario CLI recién compilado.
+  2. Verifica que todo ejecutable cosechado como GUI o incluido en instaladores (WiX MSI / Inno Setup) tenga un nombre diferente y un hash SHA-256 estrictamente distinto al CLI.
+  3. Si no existe un binario GUI genuino, la compilación falla de inmediato con código de salida 1 en lugar de emitir artefactos defectuosos.
+
+### 4.14 Fallback de Compilación Cruzada macOS mediante Contenedor `osxcross`
+- Para compilar aplicaciones hacia Darwin (`x86_64-apple-darwin` y `aarch64-apple-darwin`) de forma 100% desatendida y sin hardware Apple físico:
+  - Si el proyecto no provee su propio Dockerfile, `dev-forge` genera al vuelo un Dockerfile multi-stage basado en `crazymax/osxcross:latest-ubuntu` y `rust:latest`.
+  - Configura los enlaces simbólicos `o64-clang` y `oa64-clang` en el entorno Linux y compila ambos destinos depositando los binarios Mach-O en `dist/`.
+
+### 4.15 Detección y Propagación de Versiones desde Ramas Git
+- Cuando un manifiesto cliente define una versión genérica o por defecto (`0.1.0`), `dev-forge` inspecciona la rama Git activa (`git branch --show-current`).
+- Si la rama sigue patrones de release (`feature/v2.0.1`, `release/2.0.1`, etc.), extrae la versión semver (`2.0.1`) y la sincroniza dinámicamente con los nombres de archivo y con el sanitizador de 3 dígitos enteros de WiX Toolset para garantizar la integridad del MSI.
+
 ---
 
 ## 5. Ergonomía del Entorno y Estabilidad Operativa

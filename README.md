@@ -31,7 +31,7 @@ flowchart LR
   - **Node.js**: Entorno LTS y empaquetadores web modernos.
 - **🛡️ Entornos Aislados e Inmutables**:
   - `forge-linux`: Debian 12 optimizado con enlazador ultrarrápido `mold` y Docker para compilación cruzada hacia macOS.
-  - `forge-windows`: Windows 11 con Visual Studio 2022 Community (MSVC nativo) y generadores de instaladores (WiX / InnoSetup).
+  - `forge-windows`: Windows Server 2022 Standard Core con Visual Studio 2022 Build Tools (MSVC nativo) y generadores de instaladores (WiX / InnoSetup).
 - **📂 Higiene Absoluta en el Proyecto Cliente**: El proyecto cliente no necesita scripts complejos de virtualización; `dev-forge` monta temporalmente la carpeta y deposita los resultados en `dist/`.
 - **🔗 Integración Universal con Agentes**: Conexión simbólica directa a `.agents` para heredar las directrices y estándares del ecosistema central.
 
