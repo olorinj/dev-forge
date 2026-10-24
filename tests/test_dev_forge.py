@@ -227,6 +227,22 @@ class TestDevForge(unittest.TestCase):
             (client_dir / "provision" / "ansible" / "linux.yml").write_text("# ansible", encoding="utf-8")
             self.assertTrue(is_dev_forge_root(client_dir))
 
+    def test_cli_runner_parser(self):
+        from dev_forge.cli import create_parser
+        parser = create_parser()
+
+        # runner up
+        args = parser.parse_args(["runner", "up", "--provision"])
+        self.assertEqual(args.subcommand, "runner")
+        self.assertEqual(args.runner_action, "up")
+        self.assertTrue(args.provision)
+
+        # runner register
+        args = parser.parse_args(["runner", "register", "token-xyz", "https://gitlab.example.com"])
+        self.assertEqual(args.runner_action, "register")
+        self.assertEqual(args.token, "token-xyz")
+        self.assertEqual(args.url, "https://gitlab.example.com")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -173,5 +173,42 @@ Vagrant.configure("2") do |config|
       }
     end
   end
+
+  # ===========================================================================
+  # 3. MAQUINA RUNNER CI/CD (GitLab Runner aislado + Docker Engine)
+  # ===========================================================================
+  config.vm.define "forge-runner", autostart: false do |runner|
+    runner.vm.box = "bento/debian-12"
+    runner.vm.hostname = "forge-runner"
+
+    # Redireccion de puertos para servidor GitLab CE local
+    runner.vm.network "forwarded_port", guest: 80, host: 8080, auto_correct: true
+    runner.vm.network "forwarded_port", guest: 443, host: 8443, auto_correct: true
+
+    # Carpeta del proyecto dev-forge y cache de compiladores
+    runner.vm.synced_folder ".", "/forge", mount_options: ["dmode=775", "fmode=775"]
+    runner.vm.synced_folder host_cache_dir, "/forge-cache", mount_options: ["dmode=775", "fmode=775", "uid=1000", "gid=1000"]
+
+    runner.vm.provider "virtualbox" do |vb|
+      vb.linked_clone = true
+      vb.name = "FORGE-RUNNER"
+      vb.memory = ENV.fetch("FORGE_RUNNER_MEM", "4096")
+      vb.cpus = ENV.fetch("FORGE_RUNNER_CPUS", "4")
+      vb.customize ["modifyvm", :id, "--ioapic", "on"]
+      vb.customize ["modifyvm", :id, "--paravirtprovider", is_darwin ? "default" : "kvm"]
+      vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
+      vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"]
+      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"] unless is_darwin
+      vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
+      vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
+      vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      vb.customize ["modifyvm", :id, "--audio", "none"]
+      vb.customize ["modifyvm", :id, "--vram", "16"]
+      vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
+      vb.customize ["modifyvm", :id, "--groups", "/DEV-FORGE"]
+    end
+
+    runner.vm.provision "shell", path: "provision/runner/setup-runner.sh"
+  end
 end
 

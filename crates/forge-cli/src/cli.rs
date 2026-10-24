@@ -86,6 +86,9 @@ pub enum Commands {
     /// Install dev-forge binary into ~/.local/bin for global execution
     InstallBin,
 
+    /// Manage the isolated CI/CD runner VM (forge-runner) and pipeline verification
+    Runner(RunnerArgs),
+
     /// Generate native shell completion scripts
     Completions {
         /// Shell type
@@ -230,6 +233,46 @@ pub struct IdeArgs {
     /// Configure SSH and environment without launching VS Code UI
     #[arg(long)]
     pub no_launch: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct RunnerArgs {
+    #[command(subcommand)]
+    pub action: RunnerAction,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum RunnerAction {
+    /// Boot the isolated CI/CD runner VM
+    Up {
+        /// Force re-provisioning on boot
+        #[arg(long)]
+        provision: bool,
+    },
+    /// Stop the runner VM
+    Halt {
+        /// Force immediate shutdown
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Show runner VM status
+    Status,
+    /// Open SSH shell into runner VM
+    Ssh {
+        /// Command to execute non-interactively
+        #[arg(short, long)]
+        command: Option<String>,
+    },
+    /// Register runner node to a remote GitLab instance
+    Register {
+        /// Runner registration token
+        token: String,
+        /// GitLab URL (default: https://gitlab.com)
+        #[arg(default_value = "https://gitlab.com")]
+        url: String,
+    },
+    /// Launch offline local GitLab CE container inside runner for air-gapped CI
+    StartGitlab,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

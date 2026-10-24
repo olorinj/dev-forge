@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Orquestación Aislada de CI/CD Runner (`dev-forge runner`)**:
+  - Definición de la máquina virtual dedicada `forge-runner` en `Vagrantfile` (`bento/debian-12` + Docker Engine + GitLab Runner).
+  - Script de aprovisionamiento idempotente `provision/runner/setup-runner.sh` con creación de swapfile de 2GB para pases intensivos de compilación.
+  - Subcomandos en CLI (`dev-forge runner <up|halt|status|ssh|register|start-gitlab>`) implementados con paridad dual en Rust y Python.
+  - Utilidades automatizadas en el guest para registro de runner (`/usr/local/bin/register-runner`) y servidor GitLab CE local para pruebas CI 100% offline (`/usr/local/bin/start-gitlab-server`).
 - **Instaladores Universales en 1 Línea (`install.sh` e `install.ps1`)**:
   - Instalación desatendida multiplataforma mediante `curl | bash` en Linux/macOS e `irm | iex` en Windows PowerShell.
   - Auto-detección de arquitecturas (`x86_64` y `aarch64` Apple Silicon).

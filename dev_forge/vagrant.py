@@ -1011,3 +1011,26 @@ def build_on_windows(
     if not success:
         log_err("Fallo en la compilación en forge-windows")
         sys.exit(1)
+
+
+def cmd_runner(args) -> None:
+    """Manage isolated CI/CD runner VM."""
+    action = args.runner_action
+    if action == "up":
+        log_info("Iniciando maquina virtual aislada 'forge-runner'...")
+        cmd_up("forge-runner", provision=args.provision)
+    elif action == "halt":
+        log_info("Deteniendo maquina virtual 'forge-runner'...")
+        cmd_halt("forge-runner", force=args.force)
+    elif action == "status":
+        run_vagrant_command(["status", "forge-runner"])
+    elif action == "ssh":
+        cmd_ssh("forge-runner", command=args.command)
+    elif action == "register":
+        log_info(f"Registrando runner contra {args.url}...")
+        reg_cmd = f"sudo register-runner '{args.token}' '{args.url}'"
+        cmd_ssh("forge-runner", command=reg_cmd)
+    elif action == "start-gitlab":
+        log_info("Iniciando contenedor local de GitLab CE en 'forge-runner'...")
+        cmd_ssh("forge-runner", command="sudo start-gitlab-server")
+        log_ok("GitLab CE iniciado en http://localhost:8080 (puerto guest: 80).")

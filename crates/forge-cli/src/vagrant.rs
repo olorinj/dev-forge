@@ -1149,3 +1149,36 @@ fn build_on_windows(
 
     Ok(())
 }
+
+pub fn cmd_runner(args: &crate::cli::RunnerArgs) -> Result<()> {
+    crate::config::load_host_profile()?;
+
+    match &args.action {
+        crate::cli::RunnerAction::Up { provision } => {
+            log_info("Iniciando maquina virtual aislada 'forge-runner'...");
+            cmd_up("forge-runner", *provision)?;
+        }
+        crate::cli::RunnerAction::Halt { force } => {
+            log_info("Deteniendo maquina virtual 'forge-runner'...");
+            cmd_halt(Some("forge-runner"), *force)?;
+        }
+        crate::cli::RunnerAction::Status => {
+            run_vagrant_streaming(&["status", "forge-runner"], &[])?;
+        }
+        crate::cli::RunnerAction::Ssh { command } => {
+            cmd_ssh("forge-runner", command.as_deref())?;
+        }
+        crate::cli::RunnerAction::Register { token, url } => {
+            log_info(&format!("Registrando runner contra {}", url));
+            let reg_cmd = format!("sudo register-runner '{}' '{}'", token, url);
+            cmd_ssh("forge-runner", Some(&reg_cmd))?;
+        }
+        crate::cli::RunnerAction::StartGitlab => {
+            log_info("Iniciando contenedor local de GitLab CE en 'forge-runner'...");
+            cmd_ssh("forge-runner", Some("sudo start-gitlab-server"))?;
+            log_ok("GitLab CE iniciado en http://localhost:8080 (puerto guest: 80).");
+        }
+    }
+
+    Ok(())
+}

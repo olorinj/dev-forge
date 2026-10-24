@@ -1,4 +1,4 @@
-﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 # =============================================================================
@@ -132,3 +132,4 @@ Write-Host "====================================================================
 Write-Host "✔ ¡Instalación de dev-forge en Windows completada con éxito!" -ForegroundColor Green
 Write-Host "Puedes invocar la forja desde cualquier directorio o terminal con: dev-forge build" -ForegroundColor Cyan
 Write-Host "=========================================================================`n" -ForegroundColor Green
+

@@ -195,6 +195,27 @@ def create_parser() -> argparse.ArgumentParser:
     # 12. install-bin
     subparsers.add_parser("install-bin", help="Install dev-forge binary into ~/.local/bin")
 
+    # 13. runner
+    runner_parser = subparsers.add_parser("runner", help="Manage isolated CI/CD runner VM (forge-runner)")
+    runner_sub = runner_parser.add_subparsers(dest="runner_action", required=True)
+
+    r_up = runner_sub.add_parser("up", help="Boot the runner VM")
+    r_up.add_argument("--provision", action="store_true", help="Force re-provisioning on boot")
+
+    r_halt = runner_sub.add_parser("halt", help="Stop the runner VM")
+    r_halt.add_argument("-f", "--force", action="store_true", help="Force immediate shutdown")
+
+    runner_sub.add_parser("status", help="Show runner VM status")
+
+    r_ssh = runner_sub.add_parser("ssh", help="Open SSH shell into runner VM")
+    r_ssh.add_argument("-c", "--command", help="Command to execute non-interactively")
+
+    r_reg = runner_sub.add_parser("register", help="Register runner against a remote GitLab instance")
+    r_reg.add_argument("token", help="Runner registration token")
+    r_reg.add_argument("url", nargs="?", default="https://gitlab.com", help="GitLab URL (default: https://gitlab.com)")
+
+    runner_sub.add_parser("start-gitlab", help="Start local containerized GitLab CE server for offline CI")
+
     return parser
 
 
@@ -254,3 +275,6 @@ def main(argv=None) -> None:
         from dev_forge.config import install_local_bin
         installed = install_local_bin()
         print(f"[dev-forge] Ejecutable instalado con éxito en: {installed}")
+    elif args.subcommand == "runner":
+        from dev_forge.vagrant import cmd_runner
+        cmd_runner(args)
