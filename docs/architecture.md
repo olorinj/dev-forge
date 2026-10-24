@@ -222,3 +222,13 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
 
 
 
+
+### 5.6 Orquestación Aislada de CI/CD Runners (`dev-forge runner`)
+- Para proyectos que requieren verificación de pipelines de integración continua (como `.gitlab-ci.yml`), DevForge encapsula la ejecución en una máquina virtual dedicada basada en Bento Debian 12 con Docker daemon y `gitlab-runner`.
+- **Aislamiento Total**: Evita la ejecución de scripts no verificados o contaminantes en el host de desarrollo y elimina la dependencia de runners compartidos en la nube.
+- **Modo 100% Offline**: Permite instanciar un servidor GitLab Community Edition (CE) local en contenedor, facilitando la validación completa de pipelines antes de realizar publicaciones remotas.
+- Para más información técnica y arquitectura detallada, consultar [`docs/gitlab-ci-runner.md`](gitlab-ci-runner.md).
+
+### 5.7 Ergonomía de Terminal y Mitigación de Latencia Starship Prompt
+- La presencia de ficheros `Vagrantfile` en la raíz de los repositorios cliente provoca que prompts modernos como [Starship](https://starship.rs/) intenten consultar la versión de Vagrant (`vagrant --version`), la cual demora entre 1.5s y 2.0s por la carga del runtime de Ruby. Esto supera el timeout predeterminado de Starship (500ms), produciendo advertencias molestas y bloqueos de interfaz en la terminal.
+- **Solución Arquitectónica de DevForge**: Al centralizar los entornos de compilación fuera del árbol de directorios de los proyectos cliente (`out-of-tree` con `VAGRANT_CWD` y `VAGRANT_DOTFILE_PATH`), los repositorios permanecen 100% limpios de metadatos de Vagrant, garantizando una respuesta instantánea y sin alertas en la consola del desarrollador.
