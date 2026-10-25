@@ -130,13 +130,15 @@ package_single_machine() {
     VBoxManage closemedium disk "${vdi_disk}" 2>/dev/null || true
 
     # 6. Actualizar descriptor box.ovf para referenciar el disco VDI
+    # NOTA: En el estándar OVF de VirtualBox CLI, el atributo ovf:format DEBE mantenerse
+    # como el estándar OVF para que el parser de VBoxManage import acepte el archivo.
+    # VirtualBox detecta y monta el disco VDI nativamente por la extensión del archivo .vdi.
     log_info "Actualizando descriptor box.ovf con el disco VDI..."
     local vmdk_name
     vmdk_name=$(basename "${src_disk}")
     local vdi_name="box-disk001.vdi"
 
     sed -i "s|${vmdk_name}|${vdi_name}|g" "${tmp_export}/box.ovf"
-    sed -i 's|http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized|http://www.virtualbox.org/ovf/machine/1.12-virtualbox.vdi|g' "${tmp_export}/box.ovf"
 
     # 7. Crear metadata.json de Vagrant
     cat << 'EOF' > "${tmp_export}/metadata.json"
