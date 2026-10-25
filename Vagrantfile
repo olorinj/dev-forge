@@ -98,17 +98,35 @@ Vagrant.configure("2") do |config|
     return override if override && !override.empty?
     return devforge_box if ENV["FORGE_FORCE_CUSTOM_BOX"] == "1"
 
+    # Verificar si existe instalada localmente la box canonica (ej: olorinj/dev-forge-linux)
     box_slug = devforge_box.gsub('/', '-VAGRANTSLASH-')
-    File.directory?(File.expand_path("~/.vagrant.d/boxes/#{box_slug}")) ? devforge_box : fallback_upstream
+    if File.directory?(File.expand_path("~/.vagrant.d/boxes/#{box_slug}"))
+      return devforge_box
+    end
+
+    # Verificar si existe instalada con el alias corto (ej: olorinj/forge-linux)
+    short_box = devforge_box.gsub("dev-forge-", "forge-")
+    short_slug = short_box.gsub('/', '-VAGRANTSLASH-')
+    if File.directory?(File.expand_path("~/.vagrant.d/boxes/#{short_slug}"))
+      return short_box
+    end
+
+    fallback_upstream
   end
 
   linux_box_name    = resolve_box("olorinj/dev-forge-linux", "bento/debian-12")
   windows_box_name  = resolve_box("olorinj/dev-forge-windows", "gusztavvargadr/windows-server-2022-standard-core")
   runner_box_name   = resolve_box("olorinj/dev-forge-runner", "bento/debian-12")
 
-  is_linux_prebaked   = (linux_box_name == "olorinj/dev-forge-linux")
-  is_windows_prebaked = (windows_box_name == "olorinj/dev-forge-windows")
-  is_runner_prebaked  = (runner_box_name == "olorinj/dev-forge-runner")
+  is_linux_prebaked   = (linux_box_name == "olorinj/dev-forge-linux" || linux_box_name == "olorinj/forge-linux")
+  is_windows_prebaked = (windows_box_name == "olorinj/dev-forge-windows" || windows_box_name == "olorinj/forge-windows")
+  is_runner_prebaked  = (runner_box_name == "olorinj/dev-forge-runner" || runner_box_name == "olorinj/forge-runner")
+
+  # En boxes pre-compiladas, Ansible solo corre si el usuario pasa explicitamente --provision
+  user_forced_provision = ARGV.include?("--provision") || ARGV.include?("provision")
+  linux_run_provision   = is_linux_prebaked ? (user_forced_provision ? "once" : "never") : "once"
+  windows_run_provision = is_windows_prebaked ? (user_forced_provision ? "once" : "never") : "once"
+  runner_run_provision  = is_runner_prebaked ? (user_forced_provision ? "once" : "never") : "once"
 
   # ===========================================================================
   # 1. MAQUINA LINUX (Para Linux nativo y macOS cruzado con Docker)
@@ -140,8 +158,8 @@ Vagrant.configure("2") do |config|
     end
 
     # Aprovisionamiento declarativo e idempotente con Ansible
-    # Si la box ya esta pre-compilada, no se ejecuta en cada boot ordinario
-    linux.vm.provision "ansible", run: (is_linux_prebaked ? "never" : "once") do |ansible|
+    # Si la box ya esta pre-compilada, no se ejecuta en cada boot ordinario a menos que se fuerce con --provision
+    linux.vm.provision "ansible", run: linux_run_provision do |ansible|
       ansible.playbook = "provision/ansible/linux.yml"
       ansible.compatibility_mode = "2.0"
       ansible.extra_vars = {
@@ -184,7 +202,7 @@ Vagrant.configure("2") do |config|
     end
 
     # Aprovisionamiento declarativo e idempotente con Ansible sobre WinRM
-    win.vm.provision "ansible", run: (is_windows_prebaked ? "never" : "once") do |ansible|
+    win.vm.provision "ansible", run: windows_run_provision do |ansible|
       ansible.playbook = "provision/ansible/windows.yml"
       ansible.compatibility_mode = "2.0"
       ansible.extra_vars = {
@@ -229,7 +247,7 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--groups", "/DEV-FORGE"]
     end
 
-    runner.vm.provision "shell", run: (is_runner_prebaked ? "never" : "once"), path: "provision/runner/setup-runner.sh"
+    runner.vm.provision "shell", run: runner_run_provision, path: "provision/runner/setup-runner.sh"
   end
 end
 

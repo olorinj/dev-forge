@@ -1073,6 +1073,7 @@ def cmd_box(args) -> None:
         machine = args.machine
         actual_machine = "forge-linux" if machine in ("linux", "forge-linux") else ("forge-windows" if machine in ("windows", "forge-windows") else ("forge-runner" if machine in ("runner", "forge-runner") else machine))
         box_file = args.box_file
+        version = getattr(args, "version", None)
         if not box_file:
             candidates = [
                 Path.home() / ".dev-forge" / "boxes",
@@ -1082,20 +1083,23 @@ def cmd_box(args) -> None:
             for d in candidates:
                 if d.is_dir():
                     for f in d.glob(f"dev-forge-{actual_machine}*.box"):
+                        if version and f"-v{version}" not in f.name:
+                            continue
                         found = f
                         break
                 if found:
                     break
             if not found:
-                log_err(f"No se encontró ningún archivo .box para '{actual_machine}'. Genera uno primero con: dev-forge box package {actual_machine}")
+                ver_str = f" versión {version}" if version else ""
+                log_err(f"No se encontró ningún archivo .box para '{actual_machine}'{ver_str}. Genera uno primero con: dev-forge box package {actual_machine}")
                 sys.exit(1)
             box_file = found
 
-        box_tag = f"olorinj/{actual_machine}"
-        log_info(f"Registrando box local '{box_tag}' desde: {box_file}...")
-        success = run_vagrant_streaming(["box", "add", box_tag, str(box_file), "--force"])
+        canonical_tag = f"olorinj/{actual_machine}" if actual_machine.startswith("dev-forge-") else f"olorinj/dev-{actual_machine}"
+        log_info(f"Registrando box local '{canonical_tag}' desde: {box_file}...")
+        success = run_vagrant_streaming(["box", "add", canonical_tag, str(box_file), "--force"])
         if success:
-            log_ok(f"Box '{box_tag}' instalada localmente con éxito en Vagrant.")
+            log_ok(f"Box '{canonical_tag}' instalada localmente con éxito en Vagrant.")
         else:
             log_err("Fallo al registrar la box en Vagrant.")
             sys.exit(1)

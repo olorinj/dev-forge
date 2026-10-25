@@ -176,6 +176,11 @@ EOF
     local sha256_val
     sha256_val=$(awk '{print $1}' "${box_filepath}.sha256")
 
+    local canonical_tag="olorinj/dev-${machine}"
+    if [[ "${machine}" == dev-* ]]; then
+        canonical_tag="olorinj/${machine}"
+    fi
+
     echo ""
     log_ok "========================================================================="
     log_ok "✔ Box generada exitosamente: ${box_filepath} (${box_size})"
@@ -183,10 +188,10 @@ EOF
     log_ok "========================================================================="
     echo ""
     echo -e "${COLOR_CYAN}Comandos para probar la box en local inmediatamente:${COLOR_RESET}"
-    echo "  vagrant box add olorinj/${machine} ${box_filepath} --force"
+    echo "  vagrant box add ${canonical_tag} ${box_filepath} --force"
     echo ""
     echo -e "${COLOR_CYAN}Comando para publicar en Vagrant Cloud (Open Source):${COLOR_RESET}"
-    echo "  vagrant cloud publish olorinj/${machine} ${VERSION} virtualbox ${box_filepath}"
+    echo "  vagrant cloud publish ${canonical_tag} ${VERSION} virtualbox ${box_filepath}"
     echo ""
 }
 

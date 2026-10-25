@@ -227,6 +227,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     b_inst = box_sub.add_parser("install", help="Install local box into Vagrant for instant usage")
     b_inst.add_argument("machine", nargs="?", default="forge-linux", help="Target machine name (default: forge-linux)")
+    b_inst.add_argument("-v", "--version", help="Version tag of the box to install")
     b_inst.add_argument("-b", "--box-file", help="Custom path to .box file")
 
     box_sub.add_parser("list", help="List dev-forge boxes installed locally in Vagrant")

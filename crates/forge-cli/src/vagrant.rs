@@ -1236,7 +1236,7 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                 anyhow::bail!("Fallo en el proceso de empaquetado de box");
             }
         }
-        crate::cli::BoxAction::Install { machine, box_file } => {
+        crate::cli::BoxAction::Install { machine, version, box_file } => {
             let actual_machine = match machine.as_str() {
                 "linux" | "forge-linux" => "forge-linux",
                 "windows" | "forge-windows" => "forge-windows",
@@ -1256,9 +1256,13 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                         for entry in entries.flatten() {
                             let path = entry.path();
                             let name = path.file_name().unwrap_or_default().to_string_lossy();
-                            if name.starts_with(&format!("dev-forge-{}", actual_machine))
-                                && name.ends_with(".box")
-                            {
+                            let matches_machine = name.starts_with(&format!("dev-forge-{}", actual_machine))
+                                || name.starts_with(&format!("dev-forge-{}", actual_machine.replace("forge-", "")));
+                            let matches_version = match version {
+                                Some(ref v) => name.contains(&format!("-v{}.", v)) || name.contains(&format!("-v{}", v)),
+                                None => true,
+                            };
+                            if matches_machine && matches_version && name.ends_with(".box") {
                                 found = Some(path);
                                 break;
                             }
@@ -1270,16 +1274,24 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                 }
                 found.with_context(|| {
                     format!(
-                        "No se encontró ningún archivo .box para '{}'. Genera uno primero con: dev-forge box package {}",
-                        actual_machine, actual_machine
+                        "No se encontró ningún archivo .box para '{}'{}. Genera uno primero con: dev-forge box package {}",
+                        actual_machine,
+                        version.as_deref().map(|v| format!(" versión {}", v)).unwrap_or_default(),
+                        actual_machine
                     )
                 })?
             };
 
-            let box_tag = format!("olorinj/{}", actual_machine);
+            // Tag canónico: olorinj/dev-forge-<machine> (ej: olorinj/dev-forge-linux)
+            let canonical_tag = if actual_machine.starts_with("dev-forge-") {
+                format!("olorinj/{}", actual_machine)
+            } else {
+                format!("olorinj/dev-{}", actual_machine)
+            };
+
             log_info(&format!(
                 "Registrando box local '{}' desde: {}...",
-                box_tag.cyan().bold(),
+                canonical_tag.cyan().bold(),
                 resolved_box.display().to_string().bold()
             ));
 
@@ -1287,7 +1299,7 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                 &[
                     "box",
                     "add",
-                    &box_tag,
+                    &canonical_tag,
                     &resolved_box.to_string_lossy(),
                     "--force",
                 ],
@@ -1297,7 +1309,7 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
             if success {
                 log_ok(&format!(
                     "Box '{}' instalada localmente con éxito en Vagrant.",
-                    box_tag
+                    canonical_tag
                 ));
                 println!();
                 println!(

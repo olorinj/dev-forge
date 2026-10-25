@@ -306,6 +306,10 @@ pub enum BoxAction {
         #[arg(default_value = "forge-linux")]
         machine: String,
 
+        /// Optional version tag of the box to install (if omitted, installs the latest found)
+        #[arg(short, long)]
+        version: Option<String>,
+
         /// Custom path to the .box file (if omitted, searches in ~/.dev-forge/boxes or dist/boxes)
         #[arg(short, long)]
         box_file: Option<PathBuf>,
