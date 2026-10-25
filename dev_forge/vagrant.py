@@ -503,19 +503,23 @@ def build_on_linux(
         build_cli = component in ("all", "cli")
         build_gui = component in ("all", "gui")
         copy_bundles = package in ("all", "bundle")
+        is_single = package == "single"
+        tauri_no_bundle_opt = " --no-bundle" if package in ("single", "bin") else ""
 
         if ptype.kind == ProjectTypeKind.RUST_TAURI:
+            cp_cli_canonical = "" if is_single else f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
             cli_step = (
                 f"echo '=== [dev-forge : Linux] Compilando CLI {app_name} ==='; "
                 f"cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release; "
                 f"if [ -f '/tmp/cargo-target/release/{app_name}' ]; then "
-                f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
-                f"  cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; "
+                f"{cp_cli_canonical}"
+                f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; "
                 f"  chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; "
                 f"fi; "
                 if build_cli
                 else ""
             )
+            cp_gui_canonical = "" if is_single else f"    cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; "
             gui_step = (
                 f"echo '=== [dev-forge : Linux] Compilando GUI {gui_name} y Bundles ==='; "
                 f"if ! command -v cargo-tauri >/dev/null 2>&1; then "
@@ -525,11 +529,11 @@ def build_on_linux(
                 f"    sudo npm install -g @tauri-apps/cli 2>/dev/null || true; "
                 f"  fi "
                 f"fi; "
-                f"cd /workspace && (if command -v cargo-tauri >/dev/null 2>&1; then cargo tauri build; else npx --yes @tauri-apps/cli build; fi); "
+                f"cd /workspace && (if command -v cargo-tauri >/dev/null 2>&1; then cargo tauri build{tauri_no_bundle_opt}; else npx --yes @tauri-apps/cli build{tauri_no_bundle_opt}; fi); "
                 f"for gb in '/tmp/cargo-target/release/{gui_name}' '/tmp/cargo-target/release/{app_name}-gui' 'src-tauri/target/release/{gui_name}' 'target/release/{gui_name}'; do "
                 f"  if [ -f \"$gb\" ]; then "
-                f"    cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; "
-                f"    cp '/workspace/dist/{app_name}-gui-linux.x86_64' '/workspace/dist/{app_name}-gui-{raw_ver}-linux.x86_64' 2>/dev/null || true; "
+                f"{cp_gui_canonical}"
+                f"    cp \"$gb\" '/workspace/dist/{app_name}-gui-{raw_ver}-linux.x86_64' 2>/dev/null || true; "
                 f"    chmod +x '/workspace/dist/{app_name}-gui-'* 2>/dev/null || true; "
                 f"    break; "
                 f"  fi; "
@@ -547,11 +551,12 @@ def build_on_linux(
             if component == "gui":
                 linux_script = f"{clean_cmd}echo '[dev-forge : Linux] GUI no aplicable para proyecto Rust estándar.';"
             else:
+                cp_rust_canonical = "" if is_single else f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
                 linux_script = (
                     f"{clean_cmd}mkdir -p /workspace/dist && cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release && "
                     f"if [ -f '/tmp/cargo-target/release/{app_name}' ]; then "
-                    f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; "
-                    f"  cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; "
+                    f"{cp_rust_canonical}"
+                    f"  cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; "
                     f"  chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; "
                     f"fi"
                 )
@@ -849,15 +854,24 @@ def build_on_windows(
         build_gui = component in ("all", "gui")
 
         if ptype.kind == ProjectTypeKind.RUST_TAURI:
+            is_single = package == "single"
+            tauri_no_bundle_opt = " --no-bundle" if package in ("single", "bin") else ""
+            copy_bundles_ps = (
+                "@('src-tauri\\target\\release\\bundle', 'target\\release\\bundle', 'C:\\target\\release\\bundle') | ForEach-Object { if (Test-Path $_) { Copy-Item -Recurse \"$_\\*\" C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue } }; "
+                if package in ("all", "bundle")
+                else ""
+            )
+            cp_cli_canonical = "" if is_single else f"  Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; "
             cli_part = (
                 f"cargo build --release; "
                 f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ "
-                f"  Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; "
-                f"  Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; "
+                f"{cp_cli_canonical}"
+                f"  Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; "
                 f"}}; "
                 if build_cli
                 else ""
             )
+            cp_gui_canonical = "" if is_single else f"Copy-Item $guiSource 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; "
             gui_part = (
                 f"$frontendDir = $null; "
                 f"if (Test-Path 'C:\\workspace\\ui\\package.json') {{ $frontendDir = 'C:\\workspace\\ui' }} "
@@ -882,7 +896,7 @@ def build_on_windows(
                 f"$tauriBuildSuccess = $false; "
                 f"if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ "
                 f"  Write-Host '[dev-forge : Windows] Ejecutando cargo-tauri build...' -ForegroundColor Cyan; "
-                f"  cargo tauri build 2>&1 | Out-Host; "
+                f"  cargo tauri build{tauri_no_bundle_opt} 2>&1 | Out-Host; "
                 f"  if ($LASTEXITCODE -eq 0) {{ $tauriBuildSuccess = $true }}; "
                 f"}}; "
                 f"if (-not $tauriBuildSuccess) {{ "
@@ -895,17 +909,16 @@ def build_on_windows(
                 f"}}; "
                 f"$cliExePath = 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe'; "
                 f"$cliHash = if (Test-Path $cliExePath) {{ (Get-FileHash $cliExePath -Algorithm SHA256).Hash }} else {{ '' }}; "
-                f"$guiTarget = 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe'; "
-                f"$guiFound = $false; "
+                f"$guiSource = $null; "
                 f"if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ "
                 f"  $h = (Get-FileHash 'C:\\target\\release\\{gui_name}.exe' -Algorithm SHA256).Hash; "
-                f"  if ($h -ne $cliHash) {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' $guiTarget -Force; $guiFound = $true }}; "
+                f"  if ($h -ne $cliHash) {{ $guiSource = 'C:\\target\\release\\{gui_name}.exe' }}; "
                 f"}}; "
-                f"if (-not $guiFound -and (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe')) {{ "
+                f"if (-not $guiSource -and (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe')) {{ "
                 f"  $h = (Get-FileHash 'src-tauri\\target\\release\\{gui_name}.exe' -Algorithm SHA256).Hash; "
-                f"  if ($h -ne $cliHash) {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' $guiTarget -Force; $guiFound = $true }}; "
+                f"  if ($h -ne $cliHash) {{ $guiSource = 'src-tauri\\target\\release\\{gui_name}.exe' }}; "
                 f"}}; "
-                f"if (-not $guiFound) {{ "
+                f"if (-not $guiSource) {{ "
                 f"  $candidates = Get-ChildItem -Path @('C:\\target\\release', 'src-tauri\\target\\release') -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue | Where-Object {{ "
                 f"    $_.FullName -notmatch '[\\\\/](deps|build|incremental|examples)[\\\\/]' -and "
                 f"    $_.Name -notmatch '(?i)(cargo|rustc|-cli-|^vc_)' -and "
@@ -915,18 +928,18 @@ def build_on_windows(
                 f"  foreach ($cand in $candidates) {{ "
                 f"    $candHash = (Get-FileHash $cand.FullName -Algorithm SHA256).Hash; "
                 f"    if ($candHash -ne $cliHash) {{ "
-                f"      Copy-Item $cand.FullName $guiTarget -Force; "
-                f"      $guiFound = $true; "
+                f"      $guiSource = $cand.FullName; "
                 f"      break; "
                 f"    }}; "
                 f"  }}; "
                 f"}}; "
-                f"if (-not $guiFound) {{ "
+                f"if (-not $guiSource) {{ "
                 f"  Write-Error '[dev-forge : Windows : ERROR FATAL] No se pudo generar ni validar el binario GUI de Tauri en src-tauri. Se rechaza usar el binario CLI como sustituto.'; "
                 f"  exit 1; "
                 f"}}; "
-                f"Copy-Item $guiTarget 'C:\\workspace\\dist\\{app_name}-gui-{raw_ver}-windows.x86_64.exe' -Force; "
-                f"@('src-tauri\\target\\release\\bundle', 'target\\release\\bundle', 'C:\\target\\release\\bundle') | ForEach-Object {{ if (Test-Path $_) {{ Copy-Item -Recurse \"$_\\*\" C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }} }}; "
+                f"{cp_gui_canonical}"
+                f"Copy-Item $guiSource 'C:\\workspace\\dist\\{app_name}-gui-{raw_ver}-windows.x86_64.exe' -Force; "
+                f"{copy_bundles_ps}"
                 if build_gui
                 else ""
             )
@@ -935,12 +948,13 @@ def build_on_windows(
             if component == "gui":
                 build_ps = f"{init_prefix}Write-Host '[dev-forge : Windows] GUI no aplicable para proyecto Rust estándar.'"
             else:
+                cp_rust_canonical = "" if package == "single" else f"  Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; "
                 build_ps = (
                     f"{init_prefix}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; "
                     f"if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; "
                     f"if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ "
-                    f"  Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; "
-                    f"  Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; "
+                    f"{cp_rust_canonical}"
+                    f"  Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; "
                     f"}}"
                 )
         elif ptype.kind == ProjectTypeKind.PYTHON:

@@ -95,8 +95,8 @@ def create_parser() -> argparse.ArgumentParser:
     build_parser.add_argument(
         "--package",
         default=None,
-        choices=["all", "bin", "bundle"],
-        help="Packaging format (all | bin | bundle)",
+        choices=["all", "bin", "bundle", "single"],
+        help="Packaging format (all | bin | bundle | single)",
     )
     build_parser.add_argument(
         "--profile",

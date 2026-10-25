@@ -154,14 +154,14 @@ class TestDevForge(unittest.TestCase):
                 self.test = False
 
         args = DummyArgs()
-        # Option 4 for component (test), 2 for Linux, 2 for bin, 2 for test profile
-        with patch("builtins.input", side_effect=["4", "2", "2", "2"]):
+        # Option 4 for component (test), 2 for Linux, 4 for single, 2 for test profile
+        with patch("builtins.input", side_effect=["4", "2", "4", "2"]):
             prompt_menu(args)
 
         self.assertEqual(args.component, "test")
         self.assertTrue(args.test)
         self.assertEqual(args.target, "linux")
-        self.assertEqual(args.package, "bin")
+        self.assertEqual(args.package, "single")
         self.assertEqual(args.profile, "test")
 
     def test_expand_path_and_recents(self):

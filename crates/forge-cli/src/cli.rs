@@ -172,6 +172,7 @@ pub enum BuildPackage {
     All,
     Bin,
     Bundle,
+    Single,
 }
 
 impl std::fmt::Display for BuildPackage {
@@ -180,6 +181,7 @@ impl std::fmt::Display for BuildPackage {
             Self::All => write!(f, "all"),
             Self::Bin => write!(f, "bin"),
             Self::Bundle => write!(f, "bundle"),
+            Self::Single => write!(f, "single"),
         }
     }
 }

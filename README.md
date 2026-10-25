@@ -136,7 +136,7 @@ Si ejecutas `dev-forge build` sin parámetros, el orquestador inicia un asistent
 1. **Selección de Proyecto**: Si te encuentras en un proyecto, lo selecciona automáticamente; si estás en un directorio neutro, te permite elegir entre los últimos 5 proyectos usados o introducir una ruta manual (con soporte para `~`).
 2. **Componente**: Todos (CLI + GUI), solo CLI, solo aplicación GUI o ejecutables de prueba (`test runners`).
 3. **Destino (Target OS)**: Todos (Linux, Windows, macOS), solo Linux, solo Windows o solo macOS.
-4. **Formato de Salida**: Binarios directos + Paquetes/Instaladores (AppImage, deb, rpm, MSI, Inno Setup), solo binarios o solo paquetes.
+4. **Formato de Salida**: Binarios directos + Paquetes/Instaladores (AppImage, deb, rpm, MSI, Inno Setup), solo binarios directos, solo paquetes, o **binario único puro** (1 solo ejecutable con versión explícita y aceleración `--no-bundle`).
 5. **Modo**: Release (optimizado) o Testing / Debug.
 
 ```bash
@@ -151,6 +151,9 @@ dev-forge build -p /ruta/a/mi-proyecto -t all
 
 # Compilar solo la aplicación GUI de escritorio hacia Windows
 dev-forge build -p /ruta/a/mi-proyecto -t windows --component gui
+
+# Compilar solo el ejecutable GUI de Linux (1 único fichero, sin AppImage ni .deb)
+dev-forge build -p /ruta/a/mi-proyecto -t linux --component gui --package single
 
 # Compilar solo ejecutables para pruebas / test suite en Linux
 dev-forge build -p /ruta/a/mi-proyecto -t linux --test

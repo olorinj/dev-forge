@@ -158,9 +158,10 @@ pub fn prompt_menu(args: &mut BuildArgs) -> io::Result<()> {
                 .bold()
         );
         println!("  [1] Binarios directos + Paquetes/Instaladores (AppImage, deb, rpm, MSI, Inno, DMG) {}", "[Predeterminado]".dimmed());
-        println!("  [2] Solo binarios directos (rápido, sin generadores de instaladores)");
+        println!("  [2] Solo binarios directos (Canónico + Versionado, sin bundles)");
         println!("  [3] Solo paquetes e instaladores");
-        print!("{}", "Opción [1-3] (Intro para opción 1): ".bold());
+        println!("  [4] Binario único puro (Solo ejecutable con versión explícita, sin bundles)");
+        print!("{}", "Opción [1-4] (Intro para opción 1): ".bold());
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -168,6 +169,7 @@ pub fn prompt_menu(args: &mut BuildArgs) -> io::Result<()> {
         match input.trim() {
             "2" => args.package = Some(BuildPackage::Bin),
             "3" => args.package = Some(BuildPackage::Bundle),
+            "4" => args.package = Some(BuildPackage::Single),
             _ => args.package = Some(BuildPackage::All),
         }
     }

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Modo de Empaquetado `single` y Aceleración `--no-bundle` (`dev-forge build --package single`)**:
+  - Incorporación del subvalor `single` en `--package` y de la opción `[4] Binario único puro (Solo ejecutable con versión explícita, sin bundles)` en el menú interactivo CLI.
+  - Inyección automática del flag `--no-bundle` en `cargo tauri build` y `@tauri-apps/cli` en los modos `single` y `bin` para Linux y Windows, reduciendo sustancialmente los tiempos de compilación al evitar generar bundles innecesarios.
+  - Salida limpia de 1 solo fichero en `dist/` (`<app>-<component>-<version>-<target>.<ext>`) sin duplicado canónico redundante ni instaladores auxiliares en modo `single`.
 - **Subagente Universal y Rol de Documentación (`documentation-specialist`)**:
   - Definición del rol transversal `.agents/roles/common/documentation-specialist.md` y registro en `.agents/AGENTS.md` para mantener la sincronización continua de changelogs, READMEs, arquitectura y diagramas Mermaid.
   - Registro de `documentation-specialist` en el catálogo de subagentes y matriz de disparo de `docs/subagents.md`.

@@ -108,10 +108,11 @@ def prompt_menu(args: Any) -> None:
     if not getattr(args, "package", None):
         print("\n\033[1;33m? [3/4] Seleccione el formato de salida / empaquetado:\033[0m")
         print("  [1] Binarios directos + Paquetes/Instaladores (AppImage, deb, rpm, MSI, Inno, DMG) \033[2m[Predeterminado]\033[0m")
-        print("  [2] Solo binarios directos (rápido, sin generadores de instaladores)")
+        print("  [2] Solo binarios directos (Canónico + Versionado, sin bundles)")
         print("  [3] Solo paquetes e instaladores")
+        print("  [4] Binario único puro (Solo ejecutable con versión explícita, sin bundles)")
         try:
-            choice = input("\033[1mOpción [1-3] (Intro para opción 1): \033[0m").strip()
+            choice = input("\033[1mOpción [1-4] (Intro para opción 1): \033[0m").strip()
         except (EOFError, KeyboardInterrupt):
             choice = "1"
 
@@ -119,6 +120,8 @@ def prompt_menu(args: Any) -> None:
             args.package = "bin"
         elif choice == "3":
             args.package = "bundle"
+        elif choice == "4":
+            args.package = "single"
         else:
             args.package = "all"
 

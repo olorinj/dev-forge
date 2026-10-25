@@ -573,14 +573,17 @@ fn build_on_linux(
                 let build_cli = component == BuildComponent::All || component == BuildComponent::Cli;
                 let build_gui = component == BuildComponent::All || component == BuildComponent::Gui;
                 let copy_bundles = package == BuildPackage::All || package == BuildPackage::Bundle;
+                let is_single = package == BuildPackage::Single;
+                let tauri_no_bundle_opt = if package == BuildPackage::Single || package == BuildPackage::Bin { " --no-bundle" } else { "" };
 
                 let cli_step = if build_cli {
+                    let cp_canonical = if is_single { String::new() } else { format!("cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; ") };
                     format!(
                         "echo '=== [dev-forge : Linux] Compilando CLI {app_name} ==='; \
                         cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release; \
                         if [ -f '/tmp/cargo-target/release/{app_name}' ]; then \
-                            cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; \
-                            cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                            {cp_canonical}\
+                            cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
                             chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; \
                         fi; "
                     )
@@ -589,6 +592,7 @@ fn build_on_linux(
                 };
 
                 let gui_step = if build_gui {
+                    let cp_canonical = if is_single { String::new() } else { format!("cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; ") };
                     format!(
                         "echo '=== [dev-forge : Linux] Compilando GUI {gui_name} y Bundles ==='; \
                         if ! command -v cargo-tauri >/dev/null 2>&1; then \
@@ -598,11 +602,11 @@ fn build_on_linux(
                                 sudo npm install -g @tauri-apps/cli 2>/dev/null || true; \
                             fi; \
                         fi; \
-                        cd /workspace && (if command -v cargo-tauri >/dev/null 2>&1; then cargo tauri build; else npx --yes @tauri-apps/cli build; fi); \
+                        cd /workspace && (if command -v cargo-tauri >/dev/null 2>&1; then cargo tauri build{tauri_no_bundle_opt}; else npx --yes @tauri-apps/cli build{tauri_no_bundle_opt}; fi); \
                         for gb in '/tmp/cargo-target/release/{gui_name}' '/tmp/cargo-target/release/{app_name}-gui' 'src-tauri/target/release/{gui_name}' 'target/release/{gui_name}'; do \
                             if [ -f \"$gb\" ]; then \
-                                cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; \
-                                cp '/workspace/dist/{app_name}-gui-linux.x86_64' '/workspace/dist/{app_name}-gui-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                                {cp_canonical}\
+                                cp \"$gb\" '/workspace/dist/{app_name}-gui-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
                                 chmod +x '/workspace/dist/{app_name}-gui-'* 2>/dev/null || true; \
                                 break; \
                             fi; \
@@ -630,11 +634,12 @@ fn build_on_linux(
                         clean_cmd
                     )
                 } else {
+                    let cp_canonical = if package == BuildPackage::Single { String::new() } else { format!("cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; ") };
                     format!(
                         "{}mkdir -p /workspace/dist && cd /workspace && CARGO_TARGET_DIR=/tmp/cargo-target cargo build --release && \
                         if [ -f '/tmp/cargo-target/release/{app_name}' ]; then \
-                            cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-linux.x86_64'; \
-                            cp '/workspace/dist/{app_name}-cli-linux.x86_64' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
+                            {cp_canonical}\
+                            cp '/tmp/cargo-target/release/{app_name}' '/workspace/dist/{app_name}-cli-{raw_ver}-linux.x86_64' 2>/dev/null || true; \
                             chmod +x '/workspace/dist/{app_name}-cli-'* 2>/dev/null || true; \
                         fi",
                         clean_cmd
@@ -953,13 +958,16 @@ fn build_on_windows(
                     component == BuildComponent::All || component == BuildComponent::Cli;
                 let build_gui =
                     component == BuildComponent::All || component == BuildComponent::Gui;
+                let is_single = package == BuildPackage::Single;
+                let tauri_no_bundle_opt = if package == BuildPackage::Single || package == BuildPackage::Bin { " --no-bundle" } else { "" };
 
                 let cli_part = if build_cli {
+                    let cp_canonical = if is_single { String::new() } else { format!("Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; ") };
                     format!(
                         "cargo build --release; \
                         if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ \
-                            Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; \
-                            Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; \
+                            {cp_canonical}\
+                            Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; \
                         }}; "
                     )
                 } else {
@@ -967,6 +975,13 @@ fn build_on_windows(
                 };
 
                 let gui_part = if build_gui {
+                    let copy_bundles_ps = if package == BuildPackage::All || package == BuildPackage::Bundle {
+                        "@('src-tauri\\target\\release\\bundle', 'target\\release\\bundle', 'C:\\target\\release\\bundle') | ForEach-Object { if (Test-Path $_) { Copy-Item -Recurse \"$_\\*\" C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue } }; "
+                    } else {
+                        ""
+                    };
+                    let cp_canonical = if is_single { String::new() } else { format!("Copy-Item $guiSource 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe' -Force; ") };
+
                     format!(
                         "$frontendDir = $null; \
                         if (Test-Path 'C:\\workspace\\ui\\package.json') {{ $frontendDir = 'C:\\workspace\\ui' }} \
@@ -991,7 +1006,7 @@ fn build_on_windows(
                         $tauriBuildSuccess = $false; \
                         if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ \
                             Write-Host '[dev-forge : Windows] Ejecutando cargo-tauri build...' -ForegroundColor Cyan; \
-                            cargo tauri build 2>&1 | Out-Host; \
+                            cargo tauri build{tauri_no_bundle_opt} 2>&1 | Out-Host; \
                             if ($LASTEXITCODE -eq 0) {{ $tauriBuildSuccess = $true }}; \
                         }}; \
                         if (-not $tauriBuildSuccess) {{ \
@@ -1004,17 +1019,16 @@ fn build_on_windows(
                         }}; \
                         $cliExePath = 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe'; \
                         $cliHash = if (Test-Path $cliExePath) {{ (Get-FileHash $cliExePath -Algorithm SHA256).Hash }} else {{ '' }}; \
-                        $guiTarget = 'C:\\workspace\\dist\\{app_name}-gui-windows.x86_64.exe'; \
-                        $guiFound = $false; \
+                        $guiSource = $null; \
                         if (Test-Path 'C:\\target\\release\\{gui_name}.exe') {{ \
                             $h = (Get-FileHash 'C:\\target\\release\\{gui_name}.exe' -Algorithm SHA256).Hash; \
-                            if ($h -ne $cliHash) {{ Copy-Item 'C:\\target\\release\\{gui_name}.exe' $guiTarget -Force; $guiFound = $true }}; \
+                            if ($h -ne $cliHash) {{ $guiSource = 'C:\\target\\release\\{gui_name}.exe' }}; \
                         }}; \
-                        if (-not $guiFound -and (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe')) {{ \
+                        if (-not $guiSource -and (Test-Path 'src-tauri\\target\\release\\{gui_name}.exe')) {{ \
                             $h = (Get-FileHash 'src-tauri\\target\\release\\{gui_name}.exe' -Algorithm SHA256).Hash; \
-                            if ($h -ne $cliHash) {{ Copy-Item 'src-tauri\\target\\release\\{gui_name}.exe' $guiTarget -Force; $guiFound = $true }}; \
+                            if ($h -ne $cliHash) {{ $guiSource = 'src-tauri\\target\\release\\{gui_name}.exe' }}; \
                         }}; \
-                        if (-not $guiFound) {{ \
+                        if (-not $guiSource) {{ \
                             $candidates = Get-ChildItem -Path @('C:\\target\\release', 'src-tauri\\target\\release', 'target\\release') -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue | Where-Object {{ \
                                 $_.FullName -notmatch '[\\\\/](deps|build|incremental|examples)[\\\\/]' -and \
                                 $_.Name -notmatch '(?i)(cargo|rustc|-cli-|^vc_)' -and \
@@ -1024,18 +1038,18 @@ fn build_on_windows(
                             foreach ($cand in $candidates) {{ \
                                 $candHash = (Get-FileHash $cand.FullName -Algorithm SHA256).Hash; \
                                 if ($candHash -ne $cliHash) {{ \
-                                    Copy-Item $cand.FullName $guiTarget -Force; \
-                                    $guiFound = $true; \
+                                    $guiSource = $cand.FullName; \
                                     break; \
                                 }}; \
                             }}; \
                         }}; \
-                        if (-not $guiFound) {{ \
+                        if (-not $guiSource) {{ \
                             Write-Error '[dev-forge : Windows : ERROR FATAL] No se pudo generar ni validar el binario GUI de Tauri en src-tauri. Se rechaza usar el binario CLI como sustituto.'; \
                             exit 1; \
                         }}; \
-                        Copy-Item $guiTarget 'C:\\workspace\\dist\\{app_name}-gui-{raw_ver}-windows.x86_64.exe' -Force; \
-                        @('src-tauri\\target\\release\\bundle', 'target\\release\\bundle', 'C:\\target\\release\\bundle') | ForEach-Object {{ if (Test-Path $_) {{ Copy-Item -Recurse \"$_\\*\" C:\\workspace\\dist\\ -Force -ErrorAction SilentlyContinue }} }}; "
+                        {cp_canonical}\
+                        Copy-Item $guiSource 'C:\\workspace\\dist\\{app_name}-gui-{raw_ver}-windows.x86_64.exe' -Force; \
+                        {copy_bundles_ps}"
                     )
                 } else {
                     "".to_string()
@@ -1054,12 +1068,13 @@ fn build_on_windows(
                         init_prefix
                     )
                 } else {
+                    let cp_canonical = if package == BuildPackage::Single { String::new() } else { format!("Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; ") };
                     format!(
                         "{}Set-Location C:\\workspace; $env:CARGO_TARGET_DIR='C:\\target'; cargo build --release; \
                         if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; \
                         if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ \
-                            Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' -Force; \
-                            Copy-Item 'C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; \
+                            {cp_canonical}\
+                            Copy-Item 'C:\\target\\release\\{app_name}.exe' 'C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe' -Force; \
                         }}",
                         init_prefix
                     )
