@@ -48,7 +48,7 @@
       register: stat_swapfile
 
     - name: Crear y activar swapfile de 4GB si no hay swap suficiente (< 3000MB)
-      when: ansible_memory_mb.swap.total < 3000 and not stat_swapfile.stat.exists
+      when: ansible_facts['memory_mb']['swap']['total'] < 3000 and not stat_swapfile.stat.exists
       block:
         - name: Crear archivo swapfile de 4GB
           ansible.builtin.command: fallocate -l 4G /swapfile
