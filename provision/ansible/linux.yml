@@ -111,6 +111,41 @@
       failed_when: false
       changed_when: false
 
+    - name: Configurar I/O scheduler óptimo para almacenamiento virtualizado (none)
+      ansible.builtin.copy:
+        dest: /etc/udev/rules.d/60-virtualbox-iosched.rules
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          # Usar scheduler 'none' en discos virtuales para evitar overhead en el guest
+          ACTION=="add|change", KERNEL=="sd[a-z]|vd[a-z]|nvme[0-9]*", ATTR{queue/scheduler}="none"
+
+    - name: Instalar y configurar ZRAM comprimido con zstd (patrón tune-linux)
+      block:
+        - name: Instalar paquete zram-tools
+          ansible.builtin.apt:
+            pkg: zram-tools
+            state: present
+
+        - name: Configurar parámetros ZRAM (compresión zstd y 50% de RAM)
+          ansible.builtin.copy:
+            dest: /etc/default/zramswap
+            owner: root
+            group: root
+            mode: '0644'
+            content: |
+              # Swap ultrarrápido comprimido en RAM (tune-linux)
+              ALGO=zstd
+              PERCENT=50
+              PRIORITY=100
+
+        - name: Habilitar y reiniciar servicio zramswap
+          ansible.builtin.systemd:
+            name: zramswap
+            enabled: true
+            state: restarted
+
     # -------------------------------------------------------------------------
     # 2. TECLADO Y LOCALIZACIÓN
     # -------------------------------------------------------------------------
