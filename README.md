@@ -6,6 +6,31 @@
 
 ---
 
+## 📖 De la chispa al fuego: El día en que la forja cobró vida propia
+
+En un mundo de desarrollo cada vez más hiperconectado, donde casi cualquier compilación depende de cadenas de suministro remotas y servidores en la nube que devoran telemetría, siempre he defendido el valor del software artesanal: la soberanía de compilar en local, cara a cara con el silicio.
+
+Todo desarrollador conoce esa sensación: estás inmerso en un proyecto apasionante —en mi caso, forjando el escudo de privacidad criptográfica de [LexiShield](https://github.com/olorinj/lexishield)— y de pronto te encuentras en un laberinto de entornos. Necesitas que tu criatura hable con soltura en Linux, vista con elegancia nativa en Windows y respire en macOS.
+
+Al principio, **dev-forge** era solo un humilde aprendiz en el rincón más oscuro del taller: unos cuantos scripts de apoyo para no tener que saturar mi máquina anfitriona con gigabytes de SDKs incompatibles ni alterar mi sistema operativo personal o corporativo. Pero los proyectos, al igual que los personajes en una buena historia, tienen la costumbre de crecer, evolucionar y reclamar su propio destino.
+
+La chispa prendió en el fuelle. El aprendiz superó con creces su propósito original, cobró identidad propia y se convirtió en la auténtica piedra angular de todos mis desarrollos: una cámara de forja hermética, 100% aislada y offline. Un lugar donde cualquier código fuente entra como mineral en bruto y emerge templado como un binario nativo de alta precisión, sin que un solo byte ensucie el sistema anfitrión.
+
+Hoy sale del taller personal para abrirse al mundo. Si os aporta la misma libertad, limpieza y control que a mí, la forja habrá cumplido su propósito.
+
+> [!NOTE]
+> **Aviso sobre la licencia de Windows**:  
+> La máquina virtual `forge-windows` se despliega inicialmente utilizando una imagen oficial de evaluación para desarrollo (*Windows Server Standard Core Evaluation*). Esta versión es idónea para pruebas iniciales, verificación de compilaciones MSVC y experimentación local. Para un uso continuado o en entornos de producción, el usuario es responsable de aplicar su propia licencia válida de Microsoft dentro del entorno virtualizado.
+
+### ❤️ Reconocimientos y Linaje
+Un agradecimiento muy especial a los proyectos de la comunidad sobre cuya base se sustenta esta forja:
+* Al equipo del [Bento Project (Chef Software)](https://app.vagrantup.com/bento/boxes/debian-12) por su pulcra y sólida base de **Debian 12**.
+* A [Gusztáv Varga (`gusztavvargadr`)](https://app.vagrantup.com/gusztavvargadr/boxes/windows-server-2022-standard-core) por su encomiable labor automatizando imágenes de **Windows Server Core**.
+
+Gracias a su trabajo ha sido posible dar el siguiente paso y consolidar las custom boxes de DevForge en formato VDI.
+
+---
+
 ## 🚀 Flujo de Trabajo
 
 ```mermaid
