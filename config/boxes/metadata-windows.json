@@ -1,0 +1,15 @@
+{
+  "name": "olorinj/dev-forge-windows",
+  "description": "DevForge Windows Native Build Box (Windows Server 2022 Core with MSVC, Rust, WiX, Inno, VDI format)",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "providers": [
+        {
+          "name": "virtualbox",
+          "url": "https://app.vagrantup.com/olorinj/boxes/dev-forge-windows/versions/1.0.0/providers/virtualbox/amd64/vagrant.box"
+        }
+      ]
+    }
+  ]
+}

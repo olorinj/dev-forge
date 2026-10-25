@@ -11,6 +11,13 @@ gui_enabled = false
 keep_vms_running = false
 group = "/DEV-FORGE"
 
+[boxes]
+namespace = "olorinj"
+version = "1.0.0"
+linux_box = "olorinj/dev-forge-linux"
+windows_box = "olorinj/dev-forge-windows"
+runner_box = "olorinj/dev-forge-runner"
+
 [linux]
 name = "forge-linux"
 box = "bento/debian-12"

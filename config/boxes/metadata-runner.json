@@ -1,0 +1,15 @@
+{
+  "name": "olorinj/dev-forge-runner",
+  "description": "DevForge CI/CD Runner Box (Debian 12 with GitLab Runner and Docker Engine, VDI format)",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "providers": [
+        {
+          "name": "virtualbox",
+          "url": "https://app.vagrantup.com/olorinj/boxes/dev-forge-runner/versions/1.0.0/providers/virtualbox/amd64/vagrant.box"
+        }
+      ]
+    }
+  ]
+}

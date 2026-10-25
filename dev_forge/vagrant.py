@@ -1048,3 +1048,58 @@ def cmd_runner(args) -> None:
         log_info("Iniciando contenedor local de GitLab CE en 'forge-runner'...")
         cmd_ssh("forge-runner", command="sudo start-gitlab-server")
         log_ok("GitLab CE iniciado en http://localhost:8080 (puerto guest: 80).")
+
+
+def cmd_box(args) -> None:
+    """Manage and package pre-baked VirtualBox custom boxes (VDI format)."""
+    action = args.box_action
+    forge_dir = get_forge_dir()
+
+    if action == "package":
+        machine = args.machine
+        version = args.version
+        out_dir = args.out_dir
+        log_info(f"Iniciando empaquetado VDI para '{machine}' (v{version})...")
+        script_path = forge_dir / "scripts" / "package-box-vdi.sh"
+        cmd = ["bash", str(script_path), machine, version]
+        if out_dir:
+            cmd.append(str(out_dir))
+        proc = subprocess.run(cmd, cwd=forge_dir)
+        if proc.returncode != 0:
+            log_err("Fallo en el proceso de empaquetado de box.")
+            sys.exit(1)
+
+    elif action == "install":
+        machine = args.machine
+        actual_machine = "forge-linux" if machine in ("linux", "forge-linux") else ("forge-windows" if machine in ("windows", "forge-windows") else ("forge-runner" if machine in ("runner", "forge-runner") else machine))
+        box_file = args.box_file
+        if not box_file:
+            candidates = [
+                Path.home() / ".dev-forge" / "boxes",
+                forge_dir / "dist" / "boxes",
+            ]
+            found = None
+            for d in candidates:
+                if d.is_dir():
+                    for f in d.glob(f"dev-forge-{actual_machine}*.box"):
+                        found = f
+                        break
+                if found:
+                    break
+            if not found:
+                log_err(f"No se encontró ningún archivo .box para '{actual_machine}'. Genera uno primero con: dev-forge box package {actual_machine}")
+                sys.exit(1)
+            box_file = found
+
+        box_tag = f"olorinj/{actual_machine}"
+        log_info(f"Registrando box local '{box_tag}' desde: {box_file}...")
+        success = run_vagrant_streaming(["box", "add", box_tag, str(box_file), "--force"])
+        if success:
+            log_ok(f"Box '{box_tag}' instalada localmente con éxito en Vagrant.")
+        else:
+            log_err("Fallo al registrar la box en Vagrant.")
+            sys.exit(1)
+
+    elif action == "list":
+        log_info("Consultando boxes de DevForge instaladas en Vagrant...")
+        run_vagrant_streaming(["box", "list"])

@@ -91,10 +91,30 @@ Vagrant.configure("2") do |config|
   end
 
   # ===========================================================================
+  # Resolucion Inteligente de Boxes: Prioridad Absoluta a Custom Boxes VDI
+  # ===========================================================================
+  def resolve_box(devforge_box, fallback_upstream)
+    override = ENV["FORGE_" + devforge_box.split('/').last.upcase.gsub('-', '_') + "_BOX"]
+    return override if override && !override.empty?
+    return devforge_box if ENV["FORGE_FORCE_CUSTOM_BOX"] == "1"
+
+    box_slug = devforge_box.gsub('/', '-VAGRANTSLASH-')
+    File.directory?(File.expand_path("~/.vagrant.d/boxes/#{box_slug}")) ? devforge_box : fallback_upstream
+  end
+
+  linux_box_name    = resolve_box("olorinj/dev-forge-linux", "bento/debian-12")
+  windows_box_name  = resolve_box("olorinj/dev-forge-windows", "gusztavvargadr/windows-server-2022-standard-core")
+  runner_box_name   = resolve_box("olorinj/dev-forge-runner", "bento/debian-12")
+
+  is_linux_prebaked   = (linux_box_name == "olorinj/dev-forge-linux")
+  is_windows_prebaked = (windows_box_name == "olorinj/dev-forge-windows")
+  is_runner_prebaked  = (runner_box_name == "olorinj/dev-forge-runner")
+
+  # ===========================================================================
   # 1. MAQUINA LINUX (Para Linux nativo y macOS cruzado con Docker)
   # ===========================================================================
   config.vm.define "forge-linux" do |linux|
-    linux.vm.box = "bento/debian-12"
+    linux.vm.box = linux_box_name
     linux.vm.hostname = "forge-linux"
     # Carpeta del proyecto dev-forge y caché de compiladores
     linux.vm.synced_folder ".", "/forge", mount_options: ["dmode=775", "fmode=775"]
@@ -120,7 +140,8 @@ Vagrant.configure("2") do |config|
     end
 
     # Aprovisionamiento declarativo e idempotente con Ansible
-    linux.vm.provision "ansible" do |ansible|
+    # Si la box ya esta pre-compilada, no se ejecuta en cada boot ordinario
+    linux.vm.provision "ansible", run: (is_linux_prebaked ? "never" : "once") do |ansible|
       ansible.playbook = "provision/ansible/linux.yml"
       ansible.compatibility_mode = "2.0"
       ansible.extra_vars = {
@@ -133,7 +154,7 @@ Vagrant.configure("2") do |config|
   # 2. MAQUINA WINDOWS (Para ejecutables nativos MSVC, instaladores WiX/Inno)
   # ===========================================================================
   config.vm.define "forge-windows", autostart: false do |win|
-    win.vm.box = "gusztavvargadr/windows-server-2022-standard-core"
+    win.vm.box = windows_box_name
     win.vm.hostname = "forge-windows"
     win.vm.boot_timeout = 1800
     win.vm.communicator = "winrm"
@@ -163,7 +184,7 @@ Vagrant.configure("2") do |config|
     end
 
     # Aprovisionamiento declarativo e idempotente con Ansible sobre WinRM
-    win.vm.provision "ansible" do |ansible|
+    win.vm.provision "ansible", run: (is_windows_prebaked ? "never" : "once") do |ansible|
       ansible.playbook = "provision/ansible/windows.yml"
       ansible.compatibility_mode = "2.0"
       ansible.extra_vars = {
@@ -178,7 +199,7 @@ Vagrant.configure("2") do |config|
   # 3. MAQUINA RUNNER CI/CD (GitLab Runner aislado + Docker Engine)
   # ===========================================================================
   config.vm.define "forge-runner", autostart: false do |runner|
-    runner.vm.box = "bento/debian-12"
+    runner.vm.box = runner_box_name
     runner.vm.hostname = "forge-runner"
 
     # Redireccion de puertos para servidor GitLab CE local
@@ -208,7 +229,7 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--groups", "/DEV-FORGE"]
     end
 
-    runner.vm.provision "shell", path: "provision/runner/setup-runner.sh"
+    runner.vm.provision "shell", run: (is_runner_prebaked ? "never" : "once"), path: "provision/runner/setup-runner.sh"
   end
 end
 

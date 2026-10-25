@@ -216,6 +216,21 @@ def create_parser() -> argparse.ArgumentParser:
 
     runner_sub.add_parser("start-gitlab", help="Start local containerized GitLab CE server for offline CI")
 
+    # 14. box
+    box_parser = subparsers.add_parser("box", help="Manage and package pre-baked VirtualBox custom boxes (VDI format)")
+    box_sub = box_parser.add_subparsers(dest="box_action", required=True)
+
+    b_pack = box_sub.add_parser("package", help="Package a virtual machine into an optimized VDI box")
+    b_pack.add_argument("machine", nargs="?", default="forge-linux", help="Target machine: forge-linux, forge-windows, forge-runner, or all")
+    b_pack.add_argument("-v", "--version", default="1.0.0", help="Version tag (default: 1.0.0)")
+    b_pack.add_argument("-o", "--out-dir", help="Custom output directory for .box file")
+
+    b_inst = box_sub.add_parser("install", help="Install local box into Vagrant for instant usage")
+    b_inst.add_argument("machine", nargs="?", default="forge-linux", help="Target machine name (default: forge-linux)")
+    b_inst.add_argument("-b", "--box-file", help="Custom path to .box file")
+
+    box_sub.add_parser("list", help="List dev-forge boxes installed locally in Vagrant")
+
     return parser
 
 
@@ -278,3 +293,6 @@ def main(argv=None) -> None:
     elif args.subcommand == "runner":
         from dev_forge.vagrant import cmd_runner
         cmd_runner(args)
+    elif args.subcommand == "box":
+        from dev_forge.vagrant import cmd_box
+        cmd_box(args)

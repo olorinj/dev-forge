@@ -239,3 +239,11 @@ Para garantizar compilaciones a máxima velocidad de I/O y red, la arquitectura 
 ### 5.7 Ergonomía de Terminal y Mitigación de Latencia Starship Prompt
 - La presencia de ficheros `Vagrantfile` en la raíz de los repositorios cliente provoca que prompts modernos como [Starship](https://starship.rs/) intenten consultar la versión de Vagrant (`vagrant --version`), la cual demora entre 1.5s y 2.0s por la carga del runtime de Ruby. Esto supera el timeout predeterminado de Starship (500ms), produciendo advertencias molestas y bloqueos de interfaz en la terminal.
 - **Solución Arquitectónica de DevForge**: Al centralizar los entornos de compilación fuera del árbol de directorios de los proyectos cliente (`out-of-tree` con `VAGRANT_CWD` y `VAGRANT_DOTFILE_PATH`), los repositorios permanecen 100% limpios de metadatos de Vagrant, garantizando una respuesta instantánea y sin alertas en la consola del desarrollador.
+
+### 5.8 Despliegue Instantáneo con Custom Boxes VDI Pre-compiladas
+- Para eliminar la penalización temporal de aprovisionamiento en cada nueva máquina (donde descargar e instalar toolchains puede demorar decenas de minutos), DevForge soporta **Custom Boxes VDI** pre-compiladas y selladas.
+- **Arquitectura de Dos Capas**:
+  1. **Base Box Sellada (VDI Compacto)**: Aloja todos los toolchains de compilación (Rust, Go, Node, Java, MSVC, WiX), con servicios innecesarios deshabilitados (`bluetooth`, `cups`, `WSearch`, telemetría), bloqueo absoluto de actualizaciones automáticas (`apt-daily`, `wuauserv`) y purga de kernels antiguos manteniendo estrictamente un único kernel activo.
+  2. **Playbooks Declarativos en Git**: La fuente de la verdad para añadir nuevos lenguajes permanece en `provision/ansible/`. Prototipar un nuevo lenguaje tarda 1-2 minutos con `dev-forge provision`, y cuando se valida, se sella una nueva versión de la box con `dev-forge box package`.
+- **Formato VDI Nativo**: Al utilizar discos `.vdi` en lugar de `.vmdk`, VirtualBox aprovecha la compactación por bloques vacíos (`modifymedium --compact`), reduciendo el tamaño de transferencia y acelerando la lectura/escritura en disco.
+- Para consultar el manual completo, comandos del CLI y linaje upstream, consultar [`docs/vagrant-boxes-guide.md`](vagrant-boxes-guide.md).

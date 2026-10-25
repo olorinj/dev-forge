@@ -141,6 +141,9 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         Commands::Runner(runner_args) => {
             vagrant::cmd_runner(&runner_args)?;
         }
+        Commands::Box { action } => {
+            vagrant::cmd_box(&action)?;
+        }
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();
             clap_complete::generate(shell, &mut cmd, "dev-forge", &mut std::io::stdout());

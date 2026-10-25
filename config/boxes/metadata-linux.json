@@ -1,0 +1,15 @@
+{
+  "name": "olorinj/dev-forge-linux",
+  "description": "DevForge Linux Native Build Box (Debian 12 with Rust, Go, Node, Java, Docker, VDI format)",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "providers": [
+        {
+          "name": "virtualbox",
+          "url": "https://app.vagrantup.com/olorinj/boxes/dev-forge-linux/versions/1.0.0/providers/virtualbox/amd64/vagrant.box"
+        }
+      ]
+    }
+  ]
+}

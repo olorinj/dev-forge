@@ -89,6 +89,12 @@ pub enum Commands {
     /// Manage the isolated CI/CD runner VM (forge-runner) and pipeline verification
     Runner(RunnerArgs),
 
+    /// Manage, package and install pre-baked VirtualBox custom boxes (VDI format)
+    Box {
+        #[command(subcommand)]
+        action: BoxAction,
+    },
+
     /// Generate native shell completion scripts
     Completions {
         /// Shell type
@@ -275,6 +281,38 @@ pub enum RunnerAction {
     },
     /// Launch offline local GitLab CE container inside runner for air-gapped CI
     StartGitlab,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum BoxAction {
+    /// Package a virtual machine into an optimized pre-baked VDI box
+    Package {
+        /// Target machine to package: 'forge-linux', 'forge-windows', 'forge-runner', or 'all'
+        #[arg(default_value = "forge-linux")]
+        machine: String,
+
+        /// Version tag for the packaged box (e.g. 1.0.0)
+        #[arg(short, long, default_value = "1.0.0")]
+        version: String,
+
+        /// Custom output directory for the .box file (defaults to partition with most space)
+        #[arg(short, long)]
+        out_dir: Option<PathBuf>,
+    },
+
+    /// Register/install a locally generated box into Vagrant for instant usage
+    Install {
+        /// Target machine name: 'forge-linux', 'forge-windows', or 'forge-runner'
+        #[arg(default_value = "forge-linux")]
+        machine: String,
+
+        /// Custom path to the .box file (if omitted, searches in ~/.dev-forge/boxes or dist/boxes)
+        #[arg(short, long)]
+        box_file: Option<PathBuf>,
+    },
+
+    /// List all dev-forge boxes installed locally in Vagrant
+    List,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

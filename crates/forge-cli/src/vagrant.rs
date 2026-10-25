@@ -1197,3 +1197,122 @@ pub fn cmd_runner(args: &crate::cli::RunnerArgs) -> Result<()> {
 
     Ok(())
 }
+
+pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
+    crate::config::load_host_profile()?;
+    let forge_dir = get_forge_dir();
+
+    match action {
+        crate::cli::BoxAction::Package {
+            machine,
+            version,
+            out_dir,
+        } => {
+            log_info(&format!(
+                "Iniciando empaquetado VDI para '{}' (v{})...",
+                machine, version
+            ));
+            let script_path = forge_dir.join("scripts/package-box-vdi.sh");
+            if !script_path.is_file() {
+                anyhow::bail!(
+                    "No se encontró el script de empaquetado en: {}",
+                    script_path.display()
+                );
+            }
+
+            let mut cmd = Command::new("bash");
+            cmd.arg(&script_path).arg(machine).arg(version);
+            if let Some(out) = out_dir {
+                cmd.arg(out);
+            }
+            cmd.current_dir(&forge_dir);
+            cmd.stdout(Stdio::inherit());
+            cmd.stderr(Stdio::inherit());
+
+            let status = cmd
+                .status()
+                .with_context(|| "Fallo al ejecutar scripts/package-box-vdi.sh")?;
+            if !status.success() {
+                anyhow::bail!("Fallo en el proceso de empaquetado de box");
+            }
+        }
+        crate::cli::BoxAction::Install { machine, box_file } => {
+            let actual_machine = match machine.as_str() {
+                "linux" | "forge-linux" => "forge-linux",
+                "windows" | "forge-windows" => "forge-windows",
+                "runner" | "forge-runner" => "forge-runner",
+                other => other,
+            };
+
+            let resolved_box = if let Some(bf) = box_file {
+                bf.clone()
+            } else {
+                let home_boxes = crate::config::get_user_config_dir().join("boxes");
+                let dist_boxes = forge_dir.join("dist/boxes");
+
+                let mut found = None;
+                for dir in [home_boxes, dist_boxes] {
+                    if let Ok(entries) = std::fs::read_dir(&dir) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            let name = path.file_name().unwrap_or_default().to_string_lossy();
+                            if name.starts_with(&format!("dev-forge-{}", actual_machine))
+                                && name.ends_with(".box")
+                            {
+                                found = Some(path);
+                                break;
+                            }
+                        }
+                    }
+                    if found.is_some() {
+                        break;
+                    }
+                }
+                found.with_context(|| {
+                    format!(
+                        "No se encontró ningún archivo .box para '{}'. Genera uno primero con: dev-forge box package {}",
+                        actual_machine, actual_machine
+                    )
+                })?
+            };
+
+            let box_tag = format!("olorinj/{}", actual_machine);
+            log_info(&format!(
+                "Registrando box local '{}' desde: {}...",
+                box_tag.cyan().bold(),
+                resolved_box.display().to_string().bold()
+            ));
+
+            let success = run_vagrant_streaming(
+                &[
+                    "box",
+                    "add",
+                    &box_tag,
+                    &resolved_box.to_string_lossy(),
+                    "--force",
+                ],
+                &[],
+            )?;
+
+            if success {
+                log_ok(&format!(
+                    "Box '{}' instalada localmente con éxito en Vagrant.",
+                    box_tag
+                ));
+                println!();
+                println!(
+                    "Ahora puedes iniciarla instantáneamente con: {}",
+                    format!("vagrant up {}", actual_machine).cyan().bold()
+                );
+            } else {
+                anyhow::bail!("Fallo al registrar la box en Vagrant.");
+            }
+        }
+        crate::cli::BoxAction::List => {
+            log_info("Consultando boxes de DevForge instaladas en Vagrant...");
+            run_vagrant_streaming(&["box", "list"], &[])?;
+        }
+    }
+
+    Ok(())
+}
