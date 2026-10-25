@@ -32,9 +32,12 @@ flowchart TD
 
         Orchestrator -->|"5. Aprovisionamiento & Hypervisor"| VboxSub["⚙️ vagrant-virtualization-architect"]
         VboxSub -->|"VMs aprovisionadas, VirtIO, Caches en /tmp"| Orchestrator
+
+        Orchestrator -->|"6. Sincronización Docs, Changelog & Mermaid"| DocSub["📝 documentation-specialist"]
+        DocSub -->|"Docs, README, Changelog y diagramas al día"| Orchestrator
     end
 
-    Orchestrator -->|"6. Propuesta final limpia + Solicitud de Commit"| User
+    Orchestrator -->|"7. Propuesta final limpia + Solicitud de Commit"| User
 ```
 
 ---
@@ -86,6 +89,16 @@ flowchart TD
     - Si falla una optimización de kernel/SO, invoca rollback automático (`optimize-levelN.sh --rollback`) conforme a la invariante HashForge.
     - Si falla un build normal, apaga la VM de inmediato (`vagrant halt` / ACPI) para liberar memoria y recursos del host, a menos que el usuario haya indicado explícitamente `--keep-vm` (`-k`).
 
+### 2.5. `documentation-specialist`
+* **Definición**: Especialista en sincronización continua entre código fuente, manuales de usuario, arquitectura y changelog semántico.
+* **Rol de referencia**: [documentation-specialist.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/documentation-specialist.md).
+* **Invariantes que supervisa**:
+  - **Separación Estricta README vs `docs/`**: El `README.md` se reserva estrictamente al usuario final (propósito, instalación de 1 línea, quickstart, uso del CLI). Todo detalle técnico profundo (compiladores cruzados, flags de hipervisor, regex, pipelines) pertenece a `docs/`.
+  - **Sincronización de Arquitectura Visual**: Garantiza que todo cambio en nodos, topologías de VM o flujo de empaquetado actualice inmediatamente los diagramas Mermaid (`flowchart`, `sequenceDiagram`).
+  - **Changelog Semántico (*Keep a Changelog*)**: Mantiene `CHANGELOG.md` al día bajo `[Unreleased]` categorizando rigurosamente en `Added`, `Changed`, `Fixed` y `Security`.
+  - **Paridad y Ayuda CLI**: Verifica que cualquier flag o subcomando añadido en Rust o Python esté reflejado con exactitud en la documentación en Bash y PowerShell.
+  - **Integridad de Enlaces**: Comprueba que todos los enlaces relativos y anclas existan y no generen 404s.
+
 ---
 
 ## 3. Matriz de Disparo y Umbrales de Delegación (Trigger Policy)
@@ -99,7 +112,8 @@ flowchart TD
     Check -->|Modifica ui/, Svelte o Tauri IPC| T1["Invocar tauri-ui-specialist"]
     Check -->|Modifica Vagrantfile, provision/, scripts VM| T2["Invocar vagrant-virtualization-architect"]
     Check -->|Generación de .msi, -setup.exe, AppImage, dist/| T3["Invocar native-packager"]
-    Check -->|Cambio > 3 archivos o previo a Git Commit| T4["Invocar quality-gate-auditor"]
+    Check -->|Nuevos comandos CLI, cambio arquitectónico o cierre de versión| T4["Invocar documentation-specialist"]
+    Check -->|Cambio > 3 archivos o previo a Git Commit| T5["Invocar quality-gate-auditor"]
     Check -->|Cambio menor < 30 líneas o consulta conceptual| Direct["Resolver en hilo principal (baja latencia)"]
 ```
 

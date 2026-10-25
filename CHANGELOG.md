@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Subagente Universal y Rol de Documentación (`documentation-specialist`)**:
+  - Definición del rol transversal `.agents/roles/common/documentation-specialist.md` y registro en `.agents/AGENTS.md` para mantener la sincronización continua de changelogs, READMEs, arquitectura y diagramas Mermaid.
+  - Registro de `documentation-specialist` en el catálogo de subagentes y matriz de disparo de `docs/subagents.md`.
 - **Orquestación Aislada de CI/CD Runner (`dev-forge runner`)**:
   - Definición de la máquina virtual dedicada `forge-runner` en `Vagrantfile` (`bento/debian-12` + Docker Engine + GitLab Runner).
   - Script de aprovisionamiento idempotente `provision/runner/setup-runner.sh` con creación de swapfile de 2GB para pases intensivos de compilación.
