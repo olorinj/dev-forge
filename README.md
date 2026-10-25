@@ -13,6 +13,7 @@ flowchart LR
     Proyecto["📁 Cualquier Proyecto Cliente<br/>(Rust / Java / Python / Go)"] --> CLI["⚡ dev-forge CLI"]
     CLI --> LinuxVM["🐧 forge-linux<br/>(Linux / macOS)"]
     CLI --> WinVM["🪟 forge-windows<br/>(MSVC / WiX / InnoSetup)"]
+    CLI --> RunnerVM["🤖 forge-runner<br/>(Docker / GitLab Runner)"]
     LinuxVM --> Dist["📦 dist/<br/>(Binarios generados)"]
     WinVM --> Dist
 ```
@@ -32,6 +33,7 @@ flowchart LR
 - **🛡️ Entornos Aislados e Inmutables**:
   - `forge-linux`: Debian 12 optimizado con enlazador ultrarrápido `mold` y Docker para compilación cruzada hacia macOS.
   - `forge-windows`: Windows Server 2022 Standard Core con Visual Studio 2022 Build Tools (MSVC nativo) y generadores de instaladores (WiX / InnoSetup).
+  - `forge-runner`: Debian 12 dedicado con Docker daemon y GitLab Runner para pruebas de integración continua aisladas y 100% offline.
 - **📂 Higiene Absoluta en el Proyecto Cliente**: El proyecto cliente no necesita scripts complejos de virtualización; `dev-forge` monta temporalmente la carpeta y deposita los resultados en `dist/`.
 - **🔗 Integración Universal con Agentes**: Conexión simbólica directa a `.agents` para heredar las directrices y estándares del ecosistema central.
 
@@ -241,6 +243,38 @@ dev-forge ide setup-vscode -p /ruta/a/mi-proyecto --profile python
 # Otros perfiles disponibles: go, java, c
 dev-forge ide setup-vscode -p /ruta/a/mi-proyecto --profile go
 ```
+
+### 6. Orquestación Aislada de CI/CD Runners (`runner`)
+
+Para validar pipelines de integración continua (`.gitlab-ci.yml`) sin contaminar el host ni depender de minutos en la nube, `dev-forge` ofrece un entorno runner aislado con Docker y GitLab Runner:
+
+#### En Linux / macOS:
+```bash
+# Iniciar la máquina virtual del runner
+dev-forge runner up
+
+# Registrar el runner contra un repositorio remoto
+dev-forge runner register <TOKEN> [https://gitlab.com]
+
+# Levantar servidor GitLab CE local para pruebas 100% offline (puerto 8080)
+dev-forge runner start-gitlab
+
+# Consultar estado, sesión SSH o detener
+dev-forge runner status
+dev-forge runner ssh
+dev-forge runner halt
+```
+
+#### En Windows (PowerShell):
+```powershell
+.\bin\dev-forge.ps1 runner up
+.\bin\dev-forge.ps1 runner register <TOKEN> [https://gitlab.com]
+.\bin\dev-forge.ps1 runner start-gitlab
+.\bin\dev-forge.ps1 runner status
+.\bin\dev-forge.ps1 runner halt
+```
+
+Para más detalles sobre la arquitectura del runner aislado, consulta [`docs/gitlab-ci-runner.md`](docs/gitlab-ci-runner.md).
 
 ---
 

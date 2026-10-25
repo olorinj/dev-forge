@@ -6,7 +6,7 @@
 
 ```mermaid
 flowchart TD
-    subgraph Host["Máquina Anfitriona (Host Linux)"]
+    subgraph Host["Máquina Anfitriona (Host Linux / Windows / macOS)"]
         User["Usuario / Desarrollador"] --> CLI["CLI: dev-forge build"]
         CLI --> Detector["Motor de Detección de Lenguajes"]
         CLI --> VagrantHost["Vagrant Host Engine"]
@@ -32,18 +32,25 @@ flowchart TD
             L_Mac["Docker + osxcross + dmgbuild + rcodesign"]
         end
 
-        subgraph VM_Win["forge-windows (Windows 11)"]
-            W_MSVC["Visual Studio 2022 Community (MSVC + Windows SDK)"]
+        subgraph VM_Win["forge-windows (Windows Server 2022 Core)"]
+            W_MSVC["Visual Studio 2022 (MSVC + Windows SDK)"]
             W_Rust["Rust MSVC Toolchain (x86_64-pc-windows-msvc)"]
             W_Java["OpenJDK 21 LTS + Gradle Windows"]
             W_PyGo["Python 3.12 (PyInstaller + Nuitka) + Go Toolchain"]
             W_Pack["WiX Toolset v3/v4 (.msi) + InnoSetup (-setup.exe)"]
+        end
+
+        subgraph VM_Runner["forge-runner (Debian 12)"]
+            R_Docker["Docker Engine (docker.io)"]
+            R_Agent["GitLab Runner Agent"]
+            R_Local["(Opcional) GitLab CE local (:8080)"]
         end
     end
 
     Detector -->|"Detecta tipo"| Proyectos_Clientes
     VagrantHost -->|"Monta en /workspace"| VM_Linux
     VagrantHost -->|"Monta en c:\\workspace"| VM_Win
+    VagrantHost -->|"Ejecuta pipelines en"| VM_Runner
 
     VM_Linux -->|"Deposita binarios"| Dist["dist/ (del proyecto cliente)"]
     VM_Win -->|"Deposita binarios"| Dist

@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Generación de wrappers auxiliares (`dev-forge.cmd`) para interoperabilidad inmediata en cualquier terminal de Windows.
 - **Workflow de Release Multiplataforma (`.github/workflows/release.yml`)**:
   - Compilación automatizada de binarios nativos independientes para `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `x86_64-apple-darwin` y `aarch64-apple-darwin` con empaquetado comprimido y checksums SHA-256.
+- **Documentación y Diagramas Multi-Nodo**:
+  - Actualización de los diagramas Mermaid en `README.md` y `docs/architecture.md` incorporando la topología de 3 nodos virtuales (`forge-linux`, `forge-windows`, `forge-runner`).
+  - Nuevas secciones operativas en `README.md` y `docs/gitlab-ci-runner.md` para el control integral de runners desde CLI.
 
 ### Fixed
 - **Protección Anti-Bloqueo en Invocaciones de VirtualBox**:

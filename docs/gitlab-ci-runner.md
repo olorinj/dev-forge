@@ -140,42 +140,63 @@ end
 
 ## 3. Operational Workflows
 
+### Managing the Runner via dev-forge CLI
+
+DevForge provides dedicated subcommands to manage the runner lifecycle from the host:
+
+```bash
+# Boot the isolated runner VM
+dev-forge runner up
+
+# Check status
+dev-forge runner status
+
+# Interactive SSH session
+dev-forge runner ssh
+
+# Register with GitLab instance
+dev-forge runner register <REGISTRATION_TOKEN> [https://gitlab.example.com]
+
+# Start offline local GitLab CE server (:8080)
+dev-forge runner start-gitlab
+
+# Halt runner to release host RAM
+dev-forge runner halt
+```
+
 ### Registering with a Remote Project
 1. Obtain the registration token from GitLab (**Settings $\rightarrow$ CI/CD $\rightarrow$ Runners**).
-2. SSH into the VM:
+2. Register the runner using the DevForge CLI:
    ```bash
-   vagrant ssh
+   dev-forge runner register <REGISTRATION_TOKEN> [https://gitlab.example.com]
    ```
-3. Register using the installed helper:
+   Or directly inside the VM:
    ```bash
-   sudo register-runner <REGISTRATION_TOKEN> [https://gitlab.example.com]
+   dev-forge runner ssh -c "sudo register-runner <REGISTRATION_TOKEN> [https://gitlab.example.com]"
    ```
 
 ### 100% Offline Air-Gapped Operation
 To test pipelines completely offline:
 1. Start the containerized GitLab Community Edition server:
    ```bash
-   sudo start-gitlab-server
+   dev-forge runner start-gitlab
    ```
 2. Navigate to `http://localhost:8080` on the host machine.
 3. Retrieve root credentials:
    ```bash
-   sudo docker exec -it gitlab grep 'Password:' /etc/gitlab/initial_root_password
+   dev-forge runner ssh -c "sudo docker exec -it gitlab grep 'Password:' /etc/gitlab/initial_root_password"
    ```
 4. Push project repositories to the local instance and link the runner via `http://localhost`.
 
 ---
 
 ## 4. Resource Teardown and Lifecycle Management
-* **Suspend (Fast RAM preservation)**:
-  ```bash
-  vagrant suspend
-  ```
 * **Clean Shutdown**:
   ```bash
-  vagrant halt
+  dev-forge runner halt
   ```
-* **Destroy (Purge state and deregister runner)**:
+* **Vagrant Direct Control**:
   ```bash
-  vagrant destroy -f
+  vagrant halt forge-runner
+  vagrant destroy -f forge-runner
   ```
