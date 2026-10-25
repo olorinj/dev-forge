@@ -137,3 +137,4 @@ rm -f /EMPTY
 sync
 
 log_ok "¡Optimización del guest finalizada con éxito! Listo para apagado y empaquetado."
+

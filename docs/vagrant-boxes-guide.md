@@ -167,3 +167,4 @@ Vagrant puede consumir directamente el manifiesto de catálogo JSON versionado u
 config.vm.box = "dev-forge/linux"
 config.vm.box_url = "https://raw.githubusercontent.com/olorinj/dev-forge/main/config/boxes/metadata-linux.json"
 ```
+
