@@ -139,7 +139,7 @@ Vagrant.configure("2") do |config|
     linux.vm.synced_folder host_cache_dir, "/forge-cache", mount_options: ["dmode=775", "fmode=775", "uid=1000", "gid=1000"]
 
     linux.vm.provider "virtualbox" do |vb|
-      vb.linked_clone = true
+      vb.linked_clone = false
       vb.name = "FORGE-LINUX"
       vb.memory = ENV.fetch("FORGE_LINUX_MEM", "5120")
       vb.cpus = ENV.fetch("FORGE_LINUX_CPUS", "2")
@@ -185,7 +185,7 @@ Vagrant.configure("2") do |config|
     win.vm.synced_folder host_cache_dir, "c:/forge-cache"
 
     win.vm.provider "virtualbox" do |vb|
-      vb.linked_clone = true
+      vb.linked_clone = false
       vb.name = "FORGE-WINDOWS"
       vb.memory = ENV.fetch("FORGE_WIN_MEM", "5120")
       vb.cpus = ENV.fetch("FORGE_WIN_CPUS", "2")
@@ -229,7 +229,7 @@ Vagrant.configure("2") do |config|
     runner.vm.synced_folder host_cache_dir, "/forge-cache", mount_options: ["dmode=775", "fmode=775", "uid=1000", "gid=1000"]
 
     runner.vm.provider "virtualbox" do |vb|
-      vb.linked_clone = true
+      vb.linked_clone = false
       vb.name = "FORGE-RUNNER"
       vb.memory = ENV.fetch("FORGE_RUNNER_MEM", "4096")
       vb.cpus = ENV.fetch("FORGE_RUNNER_CPUS", "4")
