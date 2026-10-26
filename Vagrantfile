@@ -166,6 +166,9 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--groups", "/DEV-FORGE"]
     end
 
+    # Pre-crear directorios temporales de Ansible con permisos 0700 para evitar advertencias de módulo
+    linux.vm.provision "shell", run: linux_run_provision, inline: "mkdir -p /root/.ansible/tmp /home/vagrant/.ansible/tmp && chmod 0700 /root/.ansible/tmp /home/vagrant/.ansible/tmp && chown -R vagrant:vagrant /home/vagrant/.ansible"
+
     # Aprovisionamiento declarativo e idempotente con Ansible
     # Si la box ya esta pre-compilada, no se ejecuta en cada boot ordinario a menos que se fuerce con --provision
     linux.vm.provision "ansible", run: linux_run_provision do |ansible|

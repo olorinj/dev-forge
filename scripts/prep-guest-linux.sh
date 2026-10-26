@@ -112,6 +112,11 @@ rm -rf /tmp/* /var/tmp/* /var/cache/apt/archives/*.deb /var/cache/apt/*.bin 2>/d
 mkdir -p /tmp /var/tmp
 chmod 1777 /tmp /var/tmp
 
+# Garantizar estructura de directorios de Ansible para evitar advertencias de módulo
+mkdir -p /root/.ansible/tmp /home/vagrant/.ansible/tmp
+chmod 0700 /root/.ansible/tmp /home/vagrant/.ansible/tmp
+chown -R vagrant:vagrant /home/vagrant/.ansible
+
 log_ok "Cachés de paquetes y temporales purgados."
 
 # -----------------------------------------------------------------------------
