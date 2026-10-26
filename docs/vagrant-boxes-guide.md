@@ -1,6 +1,6 @@
-# Guía de Custom Boxes VDI de Despliegue Instantáneo (DevForge)
+# Guía de Custom Boxes de Despliegue Instantáneo (DevForge)
 
-Esta guía documenta la arquitectura, optimizaciones, procedimiento de empaquetado y publicación de las imágenes virtuales oficiales de DevForge (`forge-linux`, `forge-windows` y `forge-runner`) basadas en discos nativos **VDI** de VirtualBox.
+Esta guía documenta la arquitectura, optimizaciones, procedimiento de empaquetado y publicación de las imágenes virtuales oficiales de DevForge (`forge-linux`, `forge-windows` y `forge-runner`) empaquetadas conforme al estándar nativo oficial de Vagrant para máxima compatibilidad y arranque instantáneo.
 
 ```mermaid
 flowchart TD
@@ -14,12 +14,13 @@ flowchart TD
         CleanSrv["Poda de Servicios Innecesarios<br/>(bluetooth, cups, avahi, suspend, etc.)"]
         NoUpdate["Bloqueo Permanente de Auto-Updates<br/>(apt-daily, unattended-upgrades, wuauserv)"]
         OneKernel["Purga de Kernels Obsoletos<br/>(Estrictamente 1 kernel activo en /boot)"]
+        InsecureKey["Restauración Clave Vagrant Oficial<br/>(Garantiza conexión SSH limpia al primer intento)"]
     end
 
-    subgraph Packaging["3. Empaquetado VDI & Compactación"]
-        VDIConv["Conversión a VirtualBox VDI Nativo"]
-        VDICompact["VBoxManage modifymedium --compact"]
-        BoxTar["Empaquetado .box (box.ovf + VDI + metadata)"]
+    subgraph Packaging["3. Zeroing & Empaquetado Nativo"]
+        Zeroing["Zeroing in-guest (dd /EMPTY / sdelete)"]
+        BoxPkg["vagrant package (OVF + StreamOptimized)"]
+        BoxTar["Generación .box + Verificación SHA-256"]
     end
 
     subgraph Distribution["4. Distribución Oficial"]
@@ -31,9 +32,9 @@ flowchart TD
     Upstream --> Provisioning
     Bento --> Ansible
     Gusztav --> Ansible
-    Ansible --> CleanSrv --> NoUpdate --> OneKernel
-    OneKernel --> Packaging
-    Packaging --> VDIConv --> VDICompact --> BoxTar
+    Ansible --> CleanSrv --> NoUpdate --> OneKernel --> InsecureKey
+    InsecureKey --> Packaging
+    Packaging --> Zeroing --> BoxPkg --> BoxTar
     BoxTar --> Distribution
     Distribution --> LocalReg
     Distribution --> VagrantCloud
@@ -77,10 +78,11 @@ Para garantizar compilaciones 100% deterministas, arranques instantáneos (~15 s
 - **Windows**: Desactivación de Windows Search Indexing (`WSearch`), Superfetch (`SysMain`), cola de impresión (`Spooler`), telemetría (`DiagTrack`) y reporte de errores (`WerSvc`).
 - **Limpieza de Almacén WinSxS**: Ejecución de `dism.exe /online /cleanup-image /startcomponentcleanup /resetbase` y eliminación de puntos de restauración VSS (`vssadmin delete shadows /all /quiet`).
 
-### 2.4 Llenado de Ceros y Compactación VDI
+### 2.4 Llenado de Ceros y Empaquetado Estándar Vagrant
 - **Linux**: Rellenado de espacio no asignado con `dd if=/dev/zero of=/EMPTY bs=1M; sync; rm -f /EMPTY`.
 - **Windows**: Rellenado de bloques libres mediante Sysinternals `sdelete.exe -z C:`.
-- **VirtualBox**: Conversión de disco a formato **VDI** nativo y compactación física de bloques libres mediante `VBoxManage modifymedium <disco.vdi> --compact`.
+- **Restauración SSH**: Inyección de la clave pública insegura oficial de Vagrant en `/home/vagrant/.ssh/authorized_keys` para garantizar que cualquier host se autentique sin timeouts en el primer arranque.
+- **Empaquetado Oficial**: Empaquetado mediante `vagrant package` generando discos OVF compatibles (StreamOptimized) que se importan de forma instantánea sin incompatibilidades de formato de disco en ninguna versión de VirtualBox.
 
 ---
 

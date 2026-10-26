@@ -96,6 +96,7 @@ Vagrant.configure("2") do |config|
   def resolve_box(devforge_box, fallback_upstream)
     override = ENV["FORGE_" + devforge_box.split('/').last.upcase.gsub('-', '_') + "_BOX"]
     return override if override && !override.empty?
+    return fallback_upstream if ENV["FORGE_FORCE_UPSTREAM_BOX"] == "1"
     return devforge_box if ENV["FORGE_FORCE_CUSTOM_BOX"] == "1"
 
     # Verificar si existe instalada localmente la box canonica (ej: olorinj/dev-forge-linux)

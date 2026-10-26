@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
-# dev-forge : Script de Empaquetado de Custom Boxes VDI de Despliegue Instantáneo
+# dev-forge : Script de Empaquetado de Custom Boxes de Despliegue Instantáneo
 # =============================================================================
-# Orquesta la optimización in-guest, apagado, exportación a OVF, conversión y
-# compactación del disco virtual a formato VDI nativo, y empaquetado final a .box
-# con verificación de espacio libre y cálculo de suma SHA-256.
+# Orquesta la optimización in-guest, restauración de la clave SSH oficial de Vagrant,
+# apagado, y empaquetado nativo ('vagrant package') con OVF compatible,
+# verificación de espacio libre y cálculo de suma SHA-256.
 # =============================================================================
 set -euo pipefail
 
@@ -100,55 +100,10 @@ package_single_machine() {
     log_info "Apagando limpiamente ${machine}..."
     vagrant halt "${machine}"
 
-    # 4. Crear directorio temporal en la partición con espacio
-    local tmp_export
-    tmp_export=$(mktemp -d "${OUT_DIR}/tmp-export-${machine}-XXXXXX")
-    trap 'rm -rf "${tmp_export}"' EXIT
-
-    log_info "Exportando appliance OVF inicial desde VirtualBox..."
-    VBoxManage export "${vbox_name}" --output "${tmp_export}/box.ovf"
-
-    # 5. Localizar el disco virtual exportado
-    local src_disk
-    src_disk=$(find "${tmp_export}" -maxdepth 1 -name "*.vmdk" | head -n 1)
-
-    if [ -z "${src_disk}" ]; then
-        log_err "No se encontró el disco VMDK exportado en ${tmp_export}."
-        return 1
-    fi
-
-    local vdi_disk="${tmp_export}/box-disk001.vdi"
-    log_info "Convirtiendo disco exportado a formato nativo VDI..."
-    VBoxManage clonemedium disk "${src_disk}" "${vdi_disk}" --format VDI
-
-    log_info "Compactando disco VDI para eliminar bloques vacíos..."
-    VBoxManage modifymedium disk "${vdi_disk}" --compact
-
-    # Eliminar el VMDK original para liberar gigabytes inmediatamente
-    rm -f "${src_disk}"
-    # Desregistrar el VDI temporal del registro global de VirtualBox para evitar UUID leaks
-    VBoxManage closemedium disk "${vdi_disk}" 2>/dev/null || true
-
-    # 6. Actualizar descriptor box.ovf para referenciar el disco VDI
-    # NOTA: En el estándar OVF de VirtualBox CLI, el atributo ovf:format DEBE mantenerse
-    # como el estándar OVF para que el parser de VBoxManage import acepte el archivo.
-    # VirtualBox detecta y monta el disco VDI nativamente por la extensión del archivo .vdi.
-    log_info "Actualizando descriptor box.ovf con el disco VDI..."
-    local vmdk_name
-    vmdk_name=$(basename "${src_disk}")
-    local vdi_name="box-disk001.vdi"
-
-    sed -i "s|${vmdk_name}|${vdi_name}|g" "${tmp_export}/box.ovf"
-
-    # 7. Crear metadata.json de Vagrant
-    cat << 'EOF' > "${tmp_export}/metadata.json"
-{
-  "provider": "virtualbox"
-}
-EOF
-
-    # 8. Crear Vagrantfile embebido mínimo de la box
-    cat << 'EOF' > "${tmp_export}/Vagrantfile"
+    # 4. Crear Vagrantfile embebido mínimo para el paquete .box
+    local tmp_box_vf
+    tmp_box_vf=$(mktemp "${OUT_DIR}/box-vagrantfile-XXXXXX.rb")
+    cat << 'EOF' > "${tmp_box_vf}"
 Vagrant.configure("2") do |config|
   config.vm.provider "virtualbox" do |vb|
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
@@ -158,20 +113,20 @@ Vagrant.configure("2") do |config|
 end
 EOF
 
-    # 9. Empaquetar el archivo .box final (tar.gz)
+    # 5. Empaquetar usando el estándar nativo oficial de Vagrant ('vagrant package')
     local box_filename="dev-forge-${machine}-v${VERSION}.box"
     local box_filepath="${OUT_DIR}/${box_filename}"
-    log_info "Comprimiendo y generando ${box_filepath}..."
+    log_info "Generando box oficial mediante 'vagrant package' en: ${box_filepath}..."
 
-    (cd "${tmp_export}" && tar -czf "${box_filepath}" ./box.ovf ./${vdi_name} ./metadata.json ./Vagrantfile)
+    # Eliminar box previa si existe para evitar conflictos
+    rm -f "${box_filepath}" "${box_filepath}.sha256"
 
-    # 10. Calcular SHA-256 del artefacto
+    vagrant package "${machine}" --output "${box_filepath}" --vagrantfile "${tmp_box_vf}"
+    rm -f "${tmp_box_vf}"
+
+    # 6. Calcular SHA-256 del artefacto
     log_info "Calculando suma de verificación SHA-256..."
     (cd "${OUT_DIR}" && sha256sum "${box_filename}" > "${box_filename}.sha256")
-
-    # Limpiar directorio temporal
-    rm -rf "${tmp_export}"
-    trap - EXIT
 
     local box_size
     box_size=$(du -h "${box_filepath}" | awk '{print $1}')
