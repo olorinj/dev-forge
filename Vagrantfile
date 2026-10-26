@@ -8,6 +8,9 @@
 require 'fileutils'
 
 Vagrant.configure("2") do |config|
+  # Desactivar reemplazo automático de claves SSH para conservar las claves oficiales en boxes base
+  config.ssh.insert_key = false
+
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
   end
@@ -128,6 +131,11 @@ Vagrant.configure("2") do |config|
   linux_run_provision   = is_linux_prebaked ? (user_forced_provision ? "once" : "never") : "once"
   windows_run_provision = is_windows_prebaked ? (user_forced_provision ? "once" : "never") : "once"
   runner_run_provision  = is_runner_prebaked ? (user_forced_provision ? "once" : "never") : "once"
+
+  # Al reconstruir desde upstream para empaquetar una box base, conservar las claves inseguras estándar
+  if ENV["FORGE_FORCE_UPSTREAM_BOX"] == "1"
+    config.ssh.insert_key = false
+  end
 
   # ===========================================================================
   # 1. MAQUINA LINUX (Para Linux nativo y macOS cruzado con Docker)

@@ -100,6 +100,10 @@ package_single_machine() {
     log_info "Apagando limpiamente ${machine}..."
     vagrant halt "${machine}"
 
+    # Eliminar clave privada efímera local para que 'vagrant package' no inyecte
+    # una clave privada obsoleta en el paquete .box
+    rm -f "${REPO_DIR}/.vagrant/machines/${machine}/virtualbox/private_key"
+
     # 4. Crear Vagrantfile embebido mínimo para el paquete .box
     local tmp_box_vf
     tmp_box_vf=$(mktemp "${OUT_DIR}/box-vagrantfile-XXXXXX.rb")

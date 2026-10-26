@@ -122,12 +122,15 @@ log_info "5/6 Normalizando reglas de red e historiales..."
 rm -f /etc/udev/rules.d/70-persistent-net.rules 2>/dev/null || true
 rm -f /lib/udev/rules.d/75-persistent-net-generator.rules 2>/dev/null || true
 
-# Restaurar la clave pública insegura oficial de Vagrant en authorized_keys
+# Restaurar las claves públicas inseguras oficiales de Vagrant (RSA y ED25519) en authorized_keys
 # para que cualquier usuario o nuevo despliegue pueda conectar por SSH al primer intento
-log_info "Restaurando la clave pública oficial de Vagrant en authorized_keys..."
+log_info "Restaurando las claves públicas oficiales de Vagrant (RSA y ED25519) en authorized_keys..."
 mkdir -p /home/vagrant/.ssh
 chmod 0700 /home/vagrant/.ssh
-echo 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC6kivAIhyfHilFR61RGL+GPXQ2MWZWFYbAGjyiYJnAmCP3NOTd0jMZEnDkbUvxhMmBYSdETk1rRgm+R4LOzFUGaHqHDLKLX+FIPKcF96hrucXzcWyLbIbEgE98OHlnVYCzRdK8jlqm8tehUc9c9WhQ== vagrant' > /home/vagrant/.ssh/authorized_keys
+cat << 'EOF' > /home/vagrant/.ssh/authorized_keys
+ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC6kivAIhyfHilFR61RGL+GPXQ2MWZWFYbAGjyiYJnAmCP3NOTd0jMZEnDkbUvxhMmBYSdETk1rRgm+R4LOzFUGaHqHDLKLX+FIPKcF96hrucXzcWyLbIbEgE98OHlnVYCzRdK8jlqm8tehUc9c9WhQ== vagrant
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN1YdxBpNlzxDqfJyw/QKow1F+wvG9hXGoqiysfJOn5Y vagrant
+EOF
 chmod 0600 /home/vagrant/.ssh/authorized_keys
 chown -R vagrant:vagrant /home/vagrant/.ssh
 

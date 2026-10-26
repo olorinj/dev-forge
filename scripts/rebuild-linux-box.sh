@@ -178,6 +178,10 @@ log_info "${CURRENT_STEP}..."
 log_info "Apagando máquina limpiamente..."
 vagrant halt forge-linux
 
+# Eliminar clave privada efímera local para que 'vagrant package' no inyecte
+# una clave privada obsoleta o desincronizada en el paquete .box
+rm -f "${REPO_DIR}/.vagrant/machines/forge-linux/virtualbox/private_key"
+
 BOX_FILE="${OUT_DIR}/dev-forge-linux-v${VERSION}.box"
 BOX_VF="${OUT_DIR}/box-Vagrantfile-v${VERSION}.rb"
 
@@ -246,3 +250,4 @@ CURRENT_STEP="Completado"
 FINAL_OUTCOME="SUCCESS"
 
 emit_report
+
