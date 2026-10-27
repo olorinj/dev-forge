@@ -141,15 +141,21 @@ if VBoxManage list vms | grep -qi "FORGE-RUNNER"; then
     VBoxManage unregistervm FORGE-RUNNER --delete 2>/dev/null || true
 fi
 
-# 1.3 Limpiar metadatos locales de la máquina en .vagrant
+# 1.3 Limpiar carpetas huérfanas en disco para evitar errores VERR_ALREADY_EXISTS al mover al grupo /DEV-FORGE
+DEFAULT_VBOX_DIR=$(VBoxManage list systemproperties 2>/dev/null | awk -F': +' '/Default machine folder/{print $2}' || true)
+if [ -n "${DEFAULT_VBOX_DIR}" ] && [ -d "${DEFAULT_VBOX_DIR}" ]; then
+    rm -rf "${DEFAULT_VBOX_DIR}/FORGE-RUNNER" "${DEFAULT_VBOX_DIR}/DEV-FORGE/FORGE-RUNNER"
+fi
+
+# 1.4 Limpiar metadatos locales de la máquina en .vagrant
 rm -rf "${REPO_DIR}/.vagrant/machines/forge-runner"
 
-# 1.4 Eliminar la box de la base de datos de Vagrant (canónica y alias)
+# 1.5 Eliminar la box de la base de datos de Vagrant (canónica y alias)
 log_info "Purgando box olorinj/dev-forge-runner de Vagrant..."
 vagrant box remove olorinj/dev-forge-runner --all --force 2>/dev/null || true
 vagrant box remove olorinj/forge-runner --all --force 2>/dev/null || true
 
-# 1.5 Limpiar archivos de box previos en el repositorio y home
+# 1.6 Limpiar archivos de box previos en el repositorio y home
 rm -f "${OUT_DIR}/dev-forge-runner-v"*.box*
 rm -f "${HOME}/.dev-forge/boxes/dev-forge-runner-v"*.box*
 
@@ -266,3 +272,4 @@ CURRENT_STEP="Completado"
 FINAL_OUTCOME="SUCCESS"
 
 emit_report
+
