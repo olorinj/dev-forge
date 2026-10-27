@@ -108,7 +108,48 @@ El CLI ejecutará la poda, purga de kernels, zeroing, compactación VDI, generar
 
 ---
 
-## 4. Empaquetado y Prueba Local
+## 4. Reconstrucción Autónoma y Flujo por Etapas (Scripts de Rebuild)
+
+Los scripts en `scripts/` ofrecen dos flujos de trabajo: ejecución total desatendida o ejecución por etapas (`--deploy-only` y `--package-only`) para iterar antes de congelar una nueva versión:
+
+```mermaid
+flowchart LR
+    A["Ejecutar --deploy-only"] --> B["VM Lista & Viva"]
+    B --> C["Añadir SDKs / Cambios Manuales"]
+    C --> D["Ejecutar --package-only"]
+    D --> E["Box vX.Y.Z Lista"]
+```
+
+### 4.1 Flujo por Etapas (Iteración y Modificaciones Previas)
+1. **Desplegar en limpio y detenerse antes de optimizar**:
+   ```bash
+   ./scripts/rebuild-linux-box.sh 1.1.0 --deploy-only
+   # o para Windows:
+   ./scripts/rebuild-windows-box.sh 1.1.0 --deploy-only
+   ```
+2. **Acceder a la máquina e introducir mejoras/pruebas**:
+   ```bash
+   vagrant ssh forge-linux
+   # o en Windows:
+   vagrant winrm forge-windows -s powershell -c "..."
+   ```
+3. **Optimizar, empaquetar y validar la nueva box**:
+   ```bash
+   ./scripts/rebuild-linux-box.sh 1.1.0 --package-only
+   # o para Windows:
+   ./scripts/rebuild-windows-box.sh 1.1.0 --package-only
+   ```
+
+### 4.2 Flujo Directo de Reconstrucción Total
+```bash
+./scripts/rebuild-linux-box.sh 1.1.0
+./scripts/rebuild-windows-box.sh 1.1.0
+./scripts/rebuild-runner-box.sh 1.1.0
+```
+
+---
+
+## 5. Empaquetado y Prueba Local con CLI
 
 DevForge integra comandos nativos en su orquestador para gestionar todo el ciclo de vida:
 
@@ -128,7 +169,7 @@ dev-forge box list
 
 ---
 
-## 5. Publicación en Vagrant Cloud (`app.vagrantup.com/olorinj`)
+## 6. Publicación en Vagrant Cloud (`app.vagrantup.com/olorinj`)
 
 Al enlazar tu cuenta de GitHub (`olorinj`) en **Vagrant Cloud** para Open Source, el namespace oficial es `olorinj`:
 

@@ -20,8 +20,29 @@ log_ok()   { echo -e "${COLOR_GREEN}[rebuild-linux : OK]${COLOR_RESET} $1"; }
 log_warn() { echo -e "${COLOR_YELLOW}[rebuild-linux : AVISO]${COLOR_RESET} $1"; }
 log_err()  { echo -e "${COLOR_RED}[rebuild-linux : ERROR]${COLOR_RESET} $1" >&2; }
 
-VERSION="${1:-1.0.0}"
-TEST_VERIFY="${2:-true}"
+VERSION="1.0.0"
+STAGE="all" # all | deploy-only | package-only
+TEST_VERIFY="true"
+
+# Procesamiento de argumentos flexible: versión y flags (--deploy-only, --package-only, --skip-test)
+for arg in "$@"; do
+    case "${arg}" in
+        --deploy-only|deploy-only|deploy)
+            STAGE="deploy-only"
+            ;;
+        --package-only|package-only|package|finish)
+            STAGE="package-only"
+            ;;
+        --skip-test|--no-test)
+            TEST_VERIFY="false"
+            ;;
+        *)
+            if [[ "${arg}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+                VERSION="${arg}"
+            fi
+            ;;
+    esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -109,59 +130,77 @@ on_error() {
 trap on_error ERR
 
 log_info "========================================================================="
-log_info "Iniciando reconstrucción total y limpia de forge-linux (v${VERSION})"
+log_info "Iniciando proceso de forge-linux (v${VERSION}) [Modo: ${STAGE}]"
 log_info "========================================================================="
 
-# -----------------------------------------------------------------------------
-# PASO 1: Purga Previa Absoluta (Clean Sweep)
-# -----------------------------------------------------------------------------
-CURRENT_STEP="1. Purga Previa Absoluta"
-log_info "${CURRENT_STEP}..."
+if [ "${STAGE}" != "package-only" ]; then
+    # -----------------------------------------------------------------------------
+    # PASO 1: Purga Previa Absoluta (Clean Sweep)
+    # -----------------------------------------------------------------------------
+    CURRENT_STEP="1. Purga Previa Absoluta"
+    log_info "${CURRENT_STEP}..."
 
-# 1.1 Destruir máquina Vagrant si existe
-log_info "Destruyendo instancia Vagrant de forge-linux..."
-vagrant destroy forge-linux -f 2>/dev/null || true
+    # 1.1 Destruir máquina Vagrant si existe
+    log_info "Destruyendo instancia Vagrant de forge-linux..."
+    vagrant destroy forge-linux -f 2>/dev/null || true
 
-# 1.2 Limpiar residuos de VirtualBox si la VM quedó huérfana
-if VBoxManage list vms | grep -qi "FORGE-LINUX"; then
-    log_warn "Detectada VM FORGE-LINUX en VirtualBox. Forzando apagado y desregistro..."
-    VBoxManage controlvm FORGE-LINUX poweroff 2>/dev/null || true
-    sleep 2
-    VBoxManage unregistervm FORGE-LINUX --delete 2>/dev/null || true
+    # 1.2 Limpiar residuos de VirtualBox si la VM quedó huérfana
+    if VBoxManage list vms | grep -qi "FORGE-LINUX"; then
+        log_warn "Detectada VM FORGE-LINUX en VirtualBox. Forzando apagado y desregistro..."
+        VBoxManage controlvm FORGE-LINUX poweroff 2>/dev/null || true
+        sleep 2
+        VBoxManage unregistervm FORGE-LINUX --delete 2>/dev/null || true
+    fi
+
+    # 1.3 Limpiar carpetas huérfanas en disco para evitar errores VERR_ALREADY_EXISTS al mover al grupo /DEV-FORGE
+    DEFAULT_VBOX_DIR=$(VBoxManage list systemproperties 2>/dev/null | awk -F': +' '/Default machine folder/{print $2}' || true)
+    if [ -n "${DEFAULT_VBOX_DIR}" ] && [ -d "${DEFAULT_VBOX_DIR}" ]; then
+        rm -rf "${DEFAULT_VBOX_DIR}/FORGE-LINUX" "${DEFAULT_VBOX_DIR}/DEV-FORGE/FORGE-LINUX"
+    fi
+
+    # 1.4 Limpiar metadatos locales de la máquina en .vagrant
+    rm -rf "${REPO_DIR}/.vagrant/machines/forge-linux"
+
+    # 1.5 Eliminar la box de la base de datos de Vagrant (canónica y alias)
+    log_info "Purgando box olorinj/dev-forge-linux de Vagrant..."
+    vagrant box remove olorinj/dev-forge-linux --all --force 2>/dev/null || true
+    vagrant box remove olorinj/forge-linux --all --force 2>/dev/null || true
+
+    # 1.6 Limpiar archivos de box previos en el repositorio y home
+    rm -f "${OUT_DIR}/dev-forge-linux-v"*.box*
+    rm -f "${HOME}/.dev-forge/boxes/dev-forge-linux-v"*.box*
+
+    STATUS_PURGE="SUCCESS"
+    log_ok "Purga previa finalizada. Entorno 100% limpio."
+
+    # -----------------------------------------------------------------------------
+    # PASO 2: Aprovisionamiento Limpio desde Imagen Base Upstream
+    # -----------------------------------------------------------------------------
+    CURRENT_STEP="2. Aprovisionamiento Upstream con Ansible"
+    log_info "${CURRENT_STEP}..."
+    log_info "Iniciando forge-linux con imagen upstream bento/debian-12..."
+
+    FORGE_FORCE_UPSTREAM_BOX=1 vagrant up forge-linux --provision
+
+    STATUS_UPSTREAM="SUCCESS"
+    log_ok "Máquina levantada y aprovisionada con Ansible con éxito."
+
+    if [ "${STAGE}" = "deploy-only" ]; then
+        CURRENT_STEP="Detenido tras Despliegue (--deploy-only)"
+        FINAL_OUTCOME="SUCCESS (Modo deploy-only: Máquina viva lista para cambios e inspección)"
+        emit_report
+        log_ok "La máquina 'forge-linux' está levantada y lista para cambios manuales o pruebas."
+        log_info "Para interactuar con ella: vagrant ssh forge-linux"
+        log_info "Para optimizar y empaquetar cuando termines: ./scripts/rebuild-linux-box.sh ${VERSION} --package-only"
+        exit 0
+    fi
+else
+    STATUS_PURGE="SKIPPED (Modo package-only)"
+    STATUS_UPSTREAM="SKIPPED (Modo package-only: Usando VM existente)"
+    log_info "Modo --package-only activo: Omitiendo purga y despliegue upstream."
+    log_info "Asegurando que forge-linux esté encendida..."
+    vagrant up forge-linux --no-provision 2>/dev/null || true
 fi
-
-# 1.3 Limpiar carpetas huérfanas en disco para evitar errores VERR_ALREADY_EXISTS al mover al grupo /DEV-FORGE
-DEFAULT_VBOX_DIR=$(VBoxManage list systemproperties 2>/dev/null | awk -F': +' '/Default machine folder/{print $2}' || true)
-if [ -n "${DEFAULT_VBOX_DIR}" ] && [ -d "${DEFAULT_VBOX_DIR}" ]; then
-    rm -rf "${DEFAULT_VBOX_DIR}/FORGE-LINUX" "${DEFAULT_VBOX_DIR}/DEV-FORGE/FORGE-LINUX"
-fi
-
-# 1.4 Limpiar metadatos locales de la máquina en .vagrant
-rm -rf "${REPO_DIR}/.vagrant/machines/forge-linux"
-
-# 1.5 Eliminar la box de la base de datos de Vagrant (canónica y alias)
-log_info "Purgando box olorinj/dev-forge-linux de Vagrant..."
-vagrant box remove olorinj/dev-forge-linux --all --force 2>/dev/null || true
-vagrant box remove olorinj/forge-linux --all --force 2>/dev/null || true
-
-# 1.6 Limpiar archivos de box previos en el repositorio y home
-rm -f "${OUT_DIR}/dev-forge-linux-v"*.box*
-rm -f "${HOME}/.dev-forge/boxes/dev-forge-linux-v"*.box*
-
-STATUS_PURGE="SUCCESS"
-log_ok "Purga previa finalizada. Entorno 100% limpio."
-
-# -----------------------------------------------------------------------------
-# PASO 2: Aprovisionamiento Limpio desde Imagen Base Upstream
-# -----------------------------------------------------------------------------
-CURRENT_STEP="2. Aprovisionamiento Upstream con Ansible"
-log_info "${CURRENT_STEP}..."
-log_info "Iniciando forge-linux con imagen upstream bento/debian-12..."
-
-FORGE_FORCE_UPSTREAM_BOX=1 vagrant up forge-linux --provision
-
-STATUS_UPSTREAM="SUCCESS"
-log_ok "Máquina levantada y aprovisionada con Ansible con éxito."
 
 # -----------------------------------------------------------------------------
 # PASO 3: Optimización in-guest, Hardening y Restauración de Clave SSH
