@@ -114,11 +114,22 @@
           - innosetup
         state: present
 
-    - name: Instalar Visual Studio 2022 C++ Build Tools (MSVC y Windows SDK) con Chocolatey
-      chocolatey.chocolatey.win_chocolatey:
-        name: visualstudio2022buildtools
-        package_params: "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart"
-        state: present
+    - name: Instalar Visual Studio 2022 C++ Build Tools (MSVC y Windows SDK)
+      ansible.windows.win_powershell:
+        script: |
+          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vsWhere) {
+            $installed = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+            if ($installed) { exit 0 }
+          }
+          $bootstrapper = "$env:TEMP\vs_buildtools.exe"
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          & curl.exe -sSfL "https://aka.ms/vs/17/release/vs_buildtools.exe" -o $bootstrapper
+          $process = Start-Process -FilePath $bootstrapper -ArgumentList "--passive --wait --norestart --nocache --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -Wait -PassThru
+          Remove-Item -Force $bootstrapper -ErrorAction SilentlyContinue
+          if ($process.ExitCode -notin @(0, 3010)) {
+            throw "Error instalando Visual Studio Build Tools. Exit code: $($process.ExitCode)"
+          }
 
     - name: Asegurar WiX Toolset e Inno Setup en el PATH del sistema
       ansible.windows.win_powershell:
