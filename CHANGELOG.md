@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Informe Resumen Estructurado de Compilación (`DEV-FORGE BUILD EXECUTION REPORT`)**:
+  - Salida formateada y coloreada al término de cada compilación (`dev-forge build`), desglosando proyecto, versión semver detectada, sanitización WiX, destino, componente, perfil y cronometraje preciso de ejecución.
+  - Censo inteligente y diferencial de artefactos en `dist/` antes y después de compilar, clasificando entradas por tipo (`[PKG]`, `[GUI]`, `[BIN]`, `[TEST]`) con tamaño formateado en KiB/MiB/GiB y conteo total de artefactos nuevos/actualizados.
+- **Boxes Oficiales Pre-Horneadas y Scripts de Reconstrucción Autónoma**:
+  - Scripts de reconstrucción desatendida `scripts/rebuild-linux-box.sh`, `scripts/rebuild-windows-box.sh` y `scripts/rebuild-runner-box.sh`.
+  - Purgado atómico de carpetas huérfanas en VirtualBox (`/mnt/data/virtualbox/<vm>` y `/DEV-FORGE/<vm>`) para prevenir colisiones `VERR_ALREADY_EXISTS`.
+  - Saneamiento y hardening guest: bloqueo permanente de actualizaciones automáticas (APT masked, Windows Update Group Policy), purga estricta de kernels antiguos (1 único kernel activo) y preservación de claves inseguras oficiales de Vagrant para arranque instantáneo.
+  - Artefactos verificados y empaquetados en `dist/boxes/`: `dev-forge-linux-v1.0.0.box` (2,4 GB), `dev-forge-windows-v1.0.0.box` (9,0 GB) y `dev-forge-runner-v1.0.0.box` (1,3 GB), acompañados de sumas criptográficas SHA-256 e informes diagnósticos.
+- **Resolución Directa de Visual Studio Build Tools 2022**:
+  - Descarga directa del instalador oficial `vs_buildtools.exe` desde `https://aka.ms/vs/17/release/vs_buildtools.exe` en `provision/ansible/windows.yml`, solventando el error de salida 5008 ocasionado por el bootstrapper obsoleto de Chocolatey.
 - **Modo de Empaquetado `single` y Aceleración `--no-bundle` (`dev-forge build --package single`)**:
   - Incorporación del subvalor `single` en `--package` y de la opción `[4] Binario único puro (Solo ejecutable con versión explícita, sin bundles)` en el menú interactivo CLI.
   - Inyección automática del flag `--no-bundle` en `cargo tauri build` y `@tauri-apps/cli` en los modos `single` y `bin` para Linux y Windows, reduciendo sustancialmente los tiempos de compilación al evitar generar bundles innecesarios.
