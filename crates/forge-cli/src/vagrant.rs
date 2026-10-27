@@ -354,6 +354,8 @@ pub fn cmd_build(args: &mut BuildArgs) -> Result<()> {
         .with_context(|| format!("No se pudo crear carpeta dist en {:?}", dist_dir))?;
 
     let ver_info = extract_project_version(&project_path);
+    let start_instant = std::time::Instant::now();
+    let initial_dist_snapshots = snapshot_dist_files(&dist_dir);
 
     log_info(&format!(
         "Proyecto a compilar:  {}",
@@ -415,10 +417,20 @@ pub fn cmd_build(args: &mut BuildArgs) -> Result<()> {
         );
     }
 
-    log_ok(&format!(
-        "Compilacion finalizada. Binarios depositados en: {}",
-        dist_dir.display().to_string().bold()
-    ));
+    let elapsed = start_instant.elapsed();
+    let summary_opts = BuildSummaryOptions {
+        project_path: &project_path,
+        ptype: &ptype,
+        ver_display: &ver_info.display,
+        wix_display: &ver_info.wix,
+        target,
+        component,
+        profile,
+        elapsed,
+        dist_dir: &dist_dir,
+        initial_snapshots: &initial_dist_snapshots,
+    };
+    print_build_summary(&summary_opts);
 
     Ok(())
 }
@@ -1236,7 +1248,11 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                 anyhow::bail!("Fallo en el proceso de empaquetado de box");
             }
         }
-        crate::cli::BoxAction::Install { machine, version, box_file } => {
+        crate::cli::BoxAction::Install {
+            machine,
+            version,
+            box_file,
+        } => {
             let actual_machine = match machine.as_str() {
                 "linux" | "forge-linux" => "forge-linux",
                 "windows" | "forge-windows" => "forge-windows",
@@ -1256,10 +1272,17 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                         for entry in entries.flatten() {
                             let path = entry.path();
                             let name = path.file_name().unwrap_or_default().to_string_lossy();
-                            let matches_machine = name.starts_with(&format!("dev-forge-{}", actual_machine))
-                                || name.starts_with(&format!("dev-forge-{}", actual_machine.replace("forge-", "")));
+                            let matches_machine = name
+                                .starts_with(&format!("dev-forge-{}", actual_machine))
+                                || name.starts_with(&format!(
+                                    "dev-forge-{}",
+                                    actual_machine.replace("forge-", "")
+                                ));
                             let matches_version = match version {
-                                Some(ref v) => name.contains(&format!("-v{}.", v)) || name.contains(&format!("-v{}", v)),
+                                Some(ref v) => {
+                                    name.contains(&format!("-v{}.", v))
+                                        || name.contains(&format!("-v{}", v))
+                                }
                                 None => true,
                             };
                             if matches_machine && matches_version && name.ends_with(".box") {
@@ -1327,4 +1350,256 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KIB: f64 = 1024.0;
+    const MIB: f64 = 1024.0 * 1024.0;
+    const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
+
+    let b = bytes as f64;
+    if b >= GIB {
+        format!("{:.2} GiB", b / GIB)
+    } else if b >= MIB {
+        format!("{:.1} MiB", b / MIB)
+    } else if b >= KIB {
+        format!("{:.1} KiB", b / KIB)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+fn format_duration_friendly(d: std::time::Duration) -> String {
+    let total_secs = d.as_secs();
+    let mins = total_secs / 60;
+    let secs = total_secs % 60;
+    if mins > 0 {
+        format!("{}m {}s", mins, secs)
+    } else {
+        format!("{}s", secs)
+    }
+}
+
+fn snapshot_dist_files(
+    dist_dir: &Path,
+) -> std::collections::HashMap<PathBuf, std::time::SystemTime> {
+    let mut snapshots = std::collections::HashMap::new();
+    if !dist_dir.is_dir() {
+        return snapshots;
+    }
+
+    fn recurse(dir: &Path, acc: &mut std::collections::HashMap<PathBuf, std::time::SystemTime>) {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    recurse(&p, acc);
+                } else if p.is_file() {
+                    if let Ok(meta) = entry.metadata() {
+                        if let Ok(mtime) = meta.modified() {
+                            acc.insert(p, mtime);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    recurse(dist_dir, &mut snapshots);
+    snapshots
+}
+
+struct BuildSummaryOptions<'a> {
+    project_path: &'a Path,
+    ptype: &'a ProjectType,
+    ver_display: &'a str,
+    wix_display: &'a str,
+    target: TargetPlatform,
+    component: BuildComponent,
+    profile: BuildProfile,
+    elapsed: std::time::Duration,
+    dist_dir: &'a Path,
+    initial_snapshots: &'a std::collections::HashMap<PathBuf, std::time::SystemTime>,
+}
+
+fn print_build_summary(opts: &BuildSummaryOptions) {
+    let project_name = extract_project_name(opts.project_path);
+    let mut generated_artifacts: Vec<(String, String, u64)> = Vec::new();
+    let mut total_bytes: u64 = 0;
+
+    fn collect_artifacts(
+        dir: &Path,
+        dist_dir: &Path,
+        initial: &std::collections::HashMap<PathBuf, std::time::SystemTime>,
+        out: &mut Vec<(String, String, u64)>,
+        total: &mut u64,
+    ) {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    collect_artifacts(&p, dist_dir, initial, out, total);
+                } else if p.is_file() {
+                    let is_new_or_modified = match initial.get(&p) {
+                        Some(prev_mtime) => entry
+                            .metadata()
+                            .and_then(|m| m.modified())
+                            .map(|mtime| mtime > *prev_mtime)
+                            .unwrap_or(false),
+                        None => true,
+                    };
+
+                    if is_new_or_modified {
+                        let rel_name = p
+                            .strip_prefix(dist_dir)
+                            .unwrap_or(&p)
+                            .to_string_lossy()
+                            .to_string();
+                        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                        *total += size;
+
+                        let cat = if rel_name.ends_with(".deb")
+                            || rel_name.ends_with(".rpm")
+                            || rel_name.ends_with(".AppImage")
+                            || rel_name.ends_with(".msi")
+                            || rel_name.contains("-setup.exe")
+                            || rel_name.ends_with(".pkg")
+                            || rel_name.ends_with(".dmg")
+                        {
+                            "PKG"
+                        } else if rel_name.contains("-gui") || rel_name.ends_with(".app") {
+                            "GUI"
+                        } else if rel_name.contains("-test") || rel_name.contains("test") {
+                            "TEST"
+                        } else {
+                            "BIN"
+                        };
+
+                        out.push((cat.to_string(), rel_name, size));
+                    }
+                }
+            }
+        }
+    }
+
+    collect_artifacts(
+        opts.dist_dir,
+        opts.dist_dir,
+        opts.initial_snapshots,
+        &mut generated_artifacts,
+        &mut total_bytes,
+    );
+
+    // Si por alguna razón no detectó deltas (ej. filesystem timestamp sin resolución suficiente),
+    // tomar todos los ficheros de dist/
+    if generated_artifacts.is_empty() {
+        let empty_map = std::collections::HashMap::new();
+        collect_artifacts(
+            opts.dist_dir,
+            opts.dist_dir,
+            &empty_map,
+            &mut generated_artifacts,
+            &mut total_bytes,
+        );
+    }
+
+    // Ordenar artefactos por categoría y nombre
+    generated_artifacts.sort_by(|a, b| a.1.cmp(&b.1));
+
+    eprintln!();
+    eprintln!(
+        "{}",
+        "================================================================================".cyan()
+    );
+    eprintln!(
+        "{}",
+        "                    DEV-FORGE BUILD EXECUTION REPORT"
+            .cyan()
+            .bold()
+    );
+    eprintln!(
+        "{}",
+        "================================================================================".cyan()
+    );
+    eprintln!(
+        "{:<25}: {} ({})",
+        "Proyecto".bold(),
+        project_name.cyan().bold(),
+        opts.project_path.display()
+    );
+    eprintln!(
+        "{:<25}: {}",
+        "Tipo de Proyecto".bold(),
+        opts.ptype.to_string().cyan()
+    );
+    eprintln!(
+        "{:<25}: {} (WiX: {})",
+        "Versión".bold(),
+        opts.ver_display.cyan().bold(),
+        opts.wix_display.green()
+    );
+    eprintln!(
+        "{:<25}: {}",
+        "Destino Plataforma".bold(),
+        opts.target.to_string().green().bold()
+    );
+    eprintln!(
+        "{:<25}: {}",
+        "Componente / Tipo".bold(),
+        opts.component.to_string().cyan()
+    );
+    eprintln!(
+        "{:<25}: {}",
+        "Modo / Perfil".bold(),
+        opts.profile.to_string().yellow().bold()
+    );
+    eprintln!(
+        "{:<25}: {}",
+        "Duración Total".bold(),
+        format_duration_friendly(opts.elapsed).green().bold()
+    );
+    eprintln!(
+        "{:<25}: {}",
+        "Resultado Final".bold(),
+        "SUCCESS".green().bold()
+    );
+
+    eprintln!();
+    eprintln!("{}", "--- ARTEFACTOS GENERADOS (dist/) ---".cyan().bold());
+    if generated_artifacts.is_empty() {
+        eprintln!("  (No se encontraron artefactos listados en dist/)");
+    } else {
+        for (cat, name, size) in &generated_artifacts {
+            let cat_colored = match cat.as_str() {
+                "PKG" => format!("[{}]", cat).magenta().bold(),
+                "GUI" => format!("[{}]", cat).blue().bold(),
+                "TEST" => format!("[{}]", cat).yellow().bold(),
+                _ => format!("[{}]", cat).green().bold(),
+            };
+            eprintln!(
+                "  {:<6} {:<50} ({})",
+                cat_colored,
+                name.bold(),
+                format_bytes(*size).cyan()
+            );
+        }
+    }
+
+    eprintln!();
+    eprintln!(
+        "{:<25}: {} nuevo(s) / actualizado(s) ({})",
+        "Total artefactos".bold(),
+        generated_artifacts.len().to_string().bold(),
+        format_bytes(total_bytes).green().bold()
+    );
+    eprintln!(
+        "{:<25}: {}",
+        "Directorio de salida".bold(),
+        opts.dist_dir.display().to_string().cyan()
+    );
+    eprintln!(
+        "{}",
+        "================================================================================".cyan()
+    );
+    eprintln!();
 }
