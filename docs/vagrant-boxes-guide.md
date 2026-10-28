@@ -173,7 +173,37 @@ dev-forge box list
 
 Al enlazar tu cuenta de GitHub (`olorinj`) en **Vagrant Cloud** para Open Source, el namespace oficial es `olorinj`:
 
-### 5.1 Publicación Directa vía Vagrant CLI
+### 6.1 Publicación Automatizada Multiplataforma (Recomendado)
+
+DevForge incluye scripts oficiales duales (Bash para Linux/macOS y PowerShell para Windows) con validación previa de sumas SHA-256, modo simulación (`--dry-run`) y soporte desatendido (`-y`):
+
+#### En Linux / macOS (Bash):
+```bash
+# Simular la publicación de todas las boxes (sin transferir tráfico de red)
+./scripts/publish-boxes.sh 1.0.0 all --dry-run
+
+# Publicar una box individual (ej. forge-linux)
+./scripts/publish-boxes.sh 1.0.0 linux
+
+# Publicar todas las boxes (linux, windows, runner)
+./scripts/publish-boxes.sh 1.0.0 all
+```
+
+#### En Windows (PowerShell):
+```powershell
+# Simular la publicación de todas las boxes en Windows
+.\scripts\publish-boxes.ps1 -Version 1.0.0 -Target all -DryRun
+
+# Publicar una box individual en Windows
+.\scripts\publish-boxes.ps1 -Version 1.0.0 -Target windows
+
+# Publicar todas las boxes
+.\scripts\publish-boxes.ps1 -Version 1.0.0 -Target all
+```
+
+---
+
+### 6.2 Publicación Manual Directa vía Vagrant CLI
 
 1. **Iniciar sesión en Vagrant Cloud desde la terminal**:
    ```bash
@@ -202,7 +232,7 @@ Al enlazar tu cuenta de GitHub (`olorinj`) en **Vagrant Cloud** para Open Source
        --release
    ```
 
-### 5.2 Alternativa: Alojamiento Directo en GitHub Releases
+### 6.3 Alternativa: Alojamiento Directo en GitHub Releases
 Si prefieres no usar el registro central de HashiCorp, puedes subir los archivos `.box` como activos adjuntos a un Release de GitHub (`https://github.com/olorinj/dev-forge/releases/tag/v1.0.0`).
 
 Vagrant puede consumir directamente el manifiesto de catálogo JSON versionado ubicado en `config/boxes/metadata-linux.json`:

@@ -605,6 +605,17 @@ fn build_on_linux(
 
                 let gui_step = if build_gui {
                     let cp_canonical = if is_single { String::new() } else { format!("cp \"$gb\" '/workspace/dist/{app_name}-gui-linux.x86_64'; ") };
+                    let sidecar_prep = if copy_bundles {
+                        format!(
+                            "if [ -f '/tmp/cargo-target/release/{app_name}' ]; then \
+                                mkdir -p src-tauri/bin 2>/dev/null || true; \
+                                target_triple=$(rustc -vV | sed -n 's/host: //p'); \
+                                cp '/tmp/cargo-target/release/{app_name}' \"src-tauri/bin/{app_name}-$target_triple\" 2>/dev/null || true; \
+                            fi; "
+                        )
+                    } else {
+                        "".to_string()
+                    };
                     format!(
                         "echo '=== [dev-forge : Linux] Compilando GUI {gui_name} y Bundles ==='; \
                         if ! command -v cargo-tauri >/dev/null 2>&1; then \
@@ -614,6 +625,7 @@ fn build_on_linux(
                                 sudo npm install -g @tauri-apps/cli 2>/dev/null || true; \
                             fi; \
                         fi; \
+                        {sidecar_prep}\
                         cd /workspace && (if command -v cargo-tauri >/dev/null 2>&1; then cargo tauri build{tauri_no_bundle_opt}; else npx --yes @tauri-apps/cli build{tauri_no_bundle_opt}; fi); \
                         for gb in '/tmp/cargo-target/release/{gui_name}' '/tmp/cargo-target/release/{app_name}-gui' 'src-tauri/target/release/{gui_name}' 'target/release/{gui_name}'; do \
                             if [ -f \"$gb\" ]; then \
@@ -1015,6 +1027,11 @@ fn build_on_windows(
                         }}; \
                         $env:DISABLE_WINRES = '1'; \
                         $env:NO_STRIP = 'true'; \
+                        if (Test-Path 'C:\\target\\release\\{app_name}.exe') {{ \
+                            if (-not (Test-Path 'C:\\workspace\\src-tauri\\bin')) {{ New-Item -ItemType Directory -Path 'C:\\workspace\\src-tauri\\bin' -Force | Out-Null }}; \
+                            $targetTriple = (& rustc -vV | Select-String 'host:').ToString().Split(':')[1].Trim(); \
+                            Copy-Item -Path 'C:\\target\\release\\{app_name}.exe' -Destination \"C:\\workspace\\src-tauri\\bin\\{app_name}-$targetTriple.exe\" -Force -ErrorAction SilentlyContinue; \
+                        }}; \
                         $tauriBuildSuccess = $false; \
                         if (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue) {{ \
                             Write-Host '[dev-forge : Windows] Ejecutando cargo-tauri build...' -ForegroundColor Cyan; \
