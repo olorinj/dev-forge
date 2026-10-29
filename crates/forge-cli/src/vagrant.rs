@@ -1315,9 +1315,10 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
         crate::cli::BoxAction::Publish {
             machine,
             version,
-            user,
+            repo,
+            split_size_mb,
             dry_run,
-            release,
+            prerelease,
             yes,
             description,
             box_dir,
@@ -1325,9 +1326,10 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
             crate::box_mgr::execute_publish(crate::box_mgr::PublishOptions {
                 machine: machine.clone(),
                 version: version.clone(),
-                user_arg: user.clone(),
+                repo_arg: repo.clone(),
+                split_size_mb: *split_size_mb,
                 dry_run: *dry_run,
-                release: *release,
+                prerelease: *prerelease,
                 auto_yes: *yes,
                 custom_desc: description.clone(),
                 box_dir: box_dir.clone(),
@@ -1344,6 +1346,7 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
             machine,
             version,
             box_file,
+            from_github,
         } => {
             let actual_machine = match machine.as_str() {
                 "linux" | "forge-linux" => "forge-linux",
@@ -1351,6 +1354,15 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                 "runner" | "forge-runner" => "forge-runner",
                 other => other,
             };
+
+            if let Some(gh_repo) = from_github {
+                crate::box_mgr::execute_install_from_github(
+                    actual_machine,
+                    gh_repo,
+                    version.as_deref().unwrap_or("1.0.0"),
+                )?;
+                return Ok(());
+            }
 
             let resolved_box = if let Some(bf) = box_file {
                 bf.clone()

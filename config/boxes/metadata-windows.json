@@ -7,7 +7,7 @@
       "providers": [
         {
           "name": "virtualbox",
-          "url": "https://app.vagrantup.com/olorinj/boxes/dev-forge-windows/versions/1.0.0/providers/virtualbox/amd64/vagrant.box"
+          "url": "https://github.com/olorinj/dev-forge/releases/download/v1.0.0/dev-forge-windows-v1.0.0.box"
         }
       ]
     }

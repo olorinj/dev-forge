@@ -25,8 +25,8 @@ flowchart TD
 
     subgraph Distribution["4. Distribución Oficial"]
         LocalReg["Vagrant Local: vagrant box add olorinj/..."]
-        VagrantCloud["Vagrant Cloud: app.vagrantup.com/olorinj/..."]
-        GHReleases["GitHub Releases: Direct HTTP Catalog"]
+        GHReleases["GitHub Releases: Direct Assets & Multipart Volumes"]
+        GHMetadata["Catálogos JSON: config/boxes/metadata-*.json"]
     end
 
     Upstream --> Provisioning
@@ -37,8 +37,8 @@ flowchart TD
     Packaging --> Zeroing --> BoxPkg --> BoxTar
     BoxTar --> Distribution
     Distribution --> LocalReg
-    Distribution --> VagrantCloud
     Distribution --> GHReleases
+    Distribution --> GHMetadata
 ```
 
 ---
@@ -47,7 +47,7 @@ flowchart TD
 
 DevForge construye sus entornos aislados sobre cajas base mantenidas por la comunidad de software libre. Se preserva y documenta su atribución original:
 
-| Máquina DevForge | Namespace Vagrant Cloud | Imagen Base Upstream | Proveedor Original | URL del Repositorio Upstream |
+| Máquina DevForge | Tag Canónico | Imagen Base Upstream | Proveedor Original | URL del Repositorio Upstream |
 | :--- | :--- | :--- | :--- | :--- |
 | **`forge-linux`** | `olorinj/dev-forge-linux` | `bento/debian-12` (v202510.26.0) | Bento Project (Chef Software) | [https://app.vagrantup.com/bento/boxes/debian-12](https://app.vagrantup.com/bento/boxes/debian-12) |
 | **`forge-windows`** | `olorinj/dev-forge-windows` | `gusztavvargadr/windows-server-2022-standard-core` | Gusztáv Varga | [https://app.vagrantup.com/gusztavvargadr/boxes/windows-server-2022-standard-core](https://app.vagrantup.com/gusztavvargadr/boxes/windows-server-2022-standard-core) |
@@ -173,60 +173,51 @@ dev-forge box list
 
 ---
 
-## 6. Publicación en Vagrant Cloud (`app.vagrantup.com`)
+## 6. Publicación y Distribución en GitHub Releases
 
-### 6.1 Publicación automatizada multiplataforma con `dev-forge box publish`
+Debido a que HashiCorp ha descontinuado la carga de nuevas boxes en Vagrant Cloud (`app.vagrantup.com`), DevForge distribuye sus imágenes pre-empaquetadas directamente como activos en **GitHub Releases** con manifiestos de catálogo JSON versionados.
 
-La publicación se gestiona directamente desde el orquestador en Rust, con validación previa de sumas SHA-256, modo simulación (`--dry-run`), soporte desatendido para CI/CD (`--yes`), y resolución segura de la organización destino (vía `--user`, variable `DEVFORGE_BOX_ORG` o `VAGRANT_CLOUD_USER`):
+### 6.1 Manejo automático de límites de tamaño (> 2 GB)
+
+GitHub Releases impone un límite estricto de **2,0 GB por asset individual**:
+- **`dev-forge-runner`** (~1,3 GB): Se sube en un único archivo `.box` íntegro.
+- **`dev-forge-linux`** (~2,4 GB) y **`dev-forge-windows`** (~9,0 GB): El orquestador divide automáticamente el paquete en volúmenes multipart (`.box.part00`, `.box.part01`, etc.) de máximo 1900 MB, calculando y firmando sumas SHA-256 individuales para cada fragmento y para el archivo unificado.
+
+### 6.2 Publicación automatizada con `dev-forge box publish`
+
+El subcomando `publish` gestiona todo el ciclo de particionado, hashes y subida a GitHub Releases (utilizando el CLI oficial `gh` o la API REST con `GITHUB_TOKEN` / `GH_TOKEN`):
 
 ```bash
-# Simular la publicación de todas las boxes (sin transferir tráfico de red)
-dev-forge box publish all --version 1.0.0 --user mi-organizacion --dry-run
+# Simulación (--dry-run): calcula hashes y particionado sin subir nada
+dev-forge box publish all --version 1.0.0 --dry-run
 
-# Publicar una box individual (ej. forge-linux)
-dev-forge box publish linux --version 1.0.0 --user mi-organizacion
+# Publicar una máquina específica (ej. forge-linux) en tu repositorio
+dev-forge box publish linux --version 1.0.0 --repo olorinj/dev-forge
 
-# Publicar todas las boxes de forma desatendida para CI/CD o agentes
-dev-forge box publish all --version 1.0.0 --user mi-organizacion --yes
+# Publicación completa desatendida para CI/CD o agentes autónomos
+dev-forge box publish all --version 1.0.0 --repo olorinj/dev-forge --yes
 ```
 
 ---
 
-### 6.2 Publicación manual directa vía Vagrant CLI
+### 6.3 Instalación y ensamblado automático con `dev-forge box install`
 
-1. **Iniciar sesión en Vagrant Cloud desde la terminal**:
-   ```bash
-   vagrant cloud auth login
-   ```
-   (Introduce tu token de acceso o autoriza la sesión en el navegador).
+Para desplegar una box oficial en una máquina limpia directamente desde el release de GitHub, `dev-forge box install` descarga automáticamente los chunks, verifica su integridad y los concatena en streaming:
 
-2. **Crear y subir la versión de la box**:
-   ```bash
-   # Para forge-linux
-   vagrant cloud publish mi-org/dev-forge-linux 1.0.0 virtualbox dist/boxes/dev-forge-linux-v1.0.0.box \
-       --description "DevForge Linux Native Build Box (Debian 12 + Rust/Go/Node/Java/Docker/VDI)" \
-       --version-description "Release v1.0.0: Pre-baked toolchains, zero auto-updates, single active kernel." \
-       --release
+```bash
+# Instalar automáticamente descargando y ensamblando los fragmentos desde GitHub Releases
+dev-forge box install linux --from-github olorinj/dev-forge --version 1.0.0
+dev-forge box install windows --from-github olorinj/dev-forge --version 1.0.0
+dev-forge box install runner --from-github olorinj/dev-forge --version 1.0.0
+```
 
-   # Para forge-windows
-   vagrant cloud publish mi-org/dev-forge-windows 1.0.0 virtualbox dist/boxes/dev-forge-windows-v1.0.0.box \
-       --description "DevForge Windows Native Build Box (WinServer 2022 Core + MSVC/WiX/Inno/VDI)" \
-       --version-description "Release v1.0.0: Pre-baked Visual Studio 2022 Build Tools, WiX 3.14, InnoSetup." \
-       --release
+---
 
-   # Para forge-runner
-   vagrant cloud publish mi-org/dev-forge-runner 1.0.0 virtualbox dist/boxes/dev-forge-runner-v1.0.0.box \
-       --description "DevForge CI/CD Runner Box (Debian 12 + GitLab Runner + Docker Engine)" \
-       --version-description "Release v1.0.0: Isolated local CI/CD execution environment." \
-       --release
-   ```
+### 6.4 Consumo directo mediante manifiestos de catálogo JSON
 
-### 6.3 Alternativa: alojamiento directo en GitHub Releases
-Si prefieres no usar el registro central de HashiCorp, puedes subir los archivos `.box` como activos adjuntos a un Release de GitHub (`https://github.com/olorinj/dev-forge/releases/tag/v1.0.0`).
-
-Vagrant puede consumir directamente el manifiesto de catálogo JSON versionado ubicado en `config/boxes/metadata-linux.json`:
+También puedes configurar tu `Vagrantfile` para apuntar a los catálogos JSON versionados alojados en el repositorio:
 ```ruby
-config.vm.box = "dev-forge/linux"
+config.vm.box = "olorinj/dev-forge-linux"
 config.vm.box_url = "https://raw.githubusercontent.com/olorinj/dev-forge/main/config/boxes/metadata-linux.json"
 ```
 

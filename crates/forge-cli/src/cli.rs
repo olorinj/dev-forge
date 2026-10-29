@@ -308,33 +308,37 @@ pub enum BoxAction {
         out_dir: Option<PathBuf>,
     },
 
-    /// Publish packaged box artifacts to Vagrant Cloud (app.vagrantup.com)
+    /// Publish packaged box artifacts to GitHub Releases (supports automatic splitting for files >2GB)
     Publish {
         /// Target box to publish: 'linux', 'windows', 'runner', or 'all'
         #[arg(default_value = "all")]
         machine: String,
 
-        /// Version to publish to Vagrant Cloud
+        /// Version to publish (e.g. 1.0.0, tags release as v<version>)
         #[arg(short, long, default_value = "1.0.0")]
         version: String,
 
-        /// Target user or organization in Vagrant Cloud (reads from DEVFORGE_BOX_ORG or VAGRANT_CLOUD_USER if omitted)
+        /// Target GitHub repository in 'owner/repo' format (defaults to git remote or GITHUB_REPOSITORY)
         #[arg(short, long, alias = "org")]
-        user: Option<String>,
+        repo: Option<String>,
 
-        /// Dry-run mode: validate files, hashes and tokens without uploading
+        /// Maximum chunk size in megabytes before splitting (default 1900 MB for GitHub Releases 2GB limit)
+        #[arg(long, default_value_t = 1900)]
+        split_size_mb: u64,
+
+        /// Dry-run mode: prepare chunks, validate hashes without uploading to GitHub
         #[arg(short = 'n', long, default_value_t = false)]
         dry_run: bool,
 
-        /// Publish as active release (default true; if false, creates as draft)
-        #[arg(long, default_value_t = true)]
-        release: bool,
+        /// Mark as pre-release (default false)
+        #[arg(long, default_value_t = false)]
+        prerelease: bool,
 
         /// Non-interactive confirmation (auto-yes for CI/CD and autonomous agents)
         #[arg(short, long, default_value_t = false)]
         yes: bool,
 
-        /// Custom catalog description for the box
+        /// Custom release title or description for the box release
         #[arg(short, long)]
         description: Option<String>,
 
@@ -358,7 +362,7 @@ pub enum BoxAction {
         out_dir: Option<PathBuf>,
     },
 
-    /// Register/install a locally generated box into Vagrant for instant usage
+    /// Register/install a locally generated or GitHub Release box into Vagrant for instant usage
     Install {
         /// Target machine name: 'forge-linux', 'forge-windows', or 'forge-runner'
         #[arg(default_value = "forge-linux")]
@@ -371,6 +375,10 @@ pub enum BoxAction {
         /// Custom path to the .box file (if omitted, searches in ~/.dev-forge/boxes or dist/boxes)
         #[arg(short, long)]
         box_file: Option<PathBuf>,
+
+        /// Download and install directly from GitHub Releases (e.g. 'olorinj/dev-forge')
+        #[arg(long)]
+        from_github: Option<String>,
     },
 
     /// List all dev-forge boxes installed locally in Vagrant
