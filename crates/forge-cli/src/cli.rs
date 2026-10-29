@@ -285,6 +285,64 @@ pub enum RunnerAction {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum BoxAction {
+    /// Rebuild a base machine from upstream with full provisioning, hardening, packaging and verification
+    Rebuild {
+        /// Target machine to rebuild: 'forge-linux', 'forge-windows', 'forge-runner', or 'all'
+        #[arg(default_value = "all")]
+        machine: String,
+
+        /// Semantic version tag for the rebuilt box
+        #[arg(short, long, default_value = "1.0.0")]
+        version: String,
+
+        /// Rebuild stage execution mode: 'all', 'deploy-only', or 'package-only'
+        #[arg(short, long, default_value = "all")]
+        stage: String,
+
+        /// Skip clean boot verification test after packaging
+        #[arg(long, default_value_t = false)]
+        skip_test: bool,
+
+        /// Custom output directory for the .box file (defaults to partition with most space)
+        #[arg(short, long)]
+        out_dir: Option<PathBuf>,
+    },
+
+    /// Publish packaged box artifacts to Vagrant Cloud (app.vagrantup.com)
+    Publish {
+        /// Target box to publish: 'linux', 'windows', 'runner', or 'all'
+        #[arg(default_value = "all")]
+        machine: String,
+
+        /// Version to publish to Vagrant Cloud
+        #[arg(short, long, default_value = "1.0.0")]
+        version: String,
+
+        /// Target user or organization in Vagrant Cloud (reads from DEVFORGE_BOX_ORG or VAGRANT_CLOUD_USER if omitted)
+        #[arg(short, long, alias = "org")]
+        user: Option<String>,
+
+        /// Dry-run mode: validate files, hashes and tokens without uploading
+        #[arg(short = 'n', long, default_value_t = false)]
+        dry_run: bool,
+
+        /// Publish as active release (default true; if false, creates as draft)
+        #[arg(long, default_value_t = true)]
+        release: bool,
+
+        /// Non-interactive confirmation (auto-yes for CI/CD and autonomous agents)
+        #[arg(short, long, default_value_t = false)]
+        yes: bool,
+
+        /// Custom catalog description for the box
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Directory containing .box and .sha256 artifacts to publish
+        #[arg(long, default_value = "dist/boxes")]
+        box_dir: PathBuf,
+    },
+
     /// Package a virtual machine into an optimized pre-baked VDI box
     Package {
         /// Target machine to package: 'forge-linux', 'forge-windows', 'forge-runner', or 'all'

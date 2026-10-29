@@ -123,9 +123,9 @@ flowchart LR
 ### 4.1 Flujo por Etapas (Iteración y Modificaciones Previas)
 1. **Desplegar en limpio y detenerse antes de optimizar**:
    ```bash
-   ./scripts/rebuild-linux-box.sh 1.1.0 --deploy-only
+   dev-forge box rebuild linux --version 1.1.0 --stage deploy-only
    # o para Windows:
-   ./scripts/rebuild-windows-box.sh 1.1.0 --deploy-only
+   dev-forge box rebuild windows --version 1.1.0 --stage deploy-only
    ```
 2. **Acceder a la máquina e introducir mejoras/pruebas**:
    ```bash
@@ -135,23 +135,27 @@ flowchart LR
    ```
 3. **Optimizar, empaquetar y validar la nueva box**:
    ```bash
-   ./scripts/rebuild-linux-box.sh 1.1.0 --package-only
+   dev-forge box rebuild linux --version 1.1.0 --stage package-only
    # o para Windows:
-   ./scripts/rebuild-windows-box.sh 1.1.0 --package-only
+   dev-forge box rebuild windows --version 1.1.0 --stage package-only
    ```
 
 ### 4.2 Flujo Directo de Reconstrucción Total
 ```bash
-./scripts/rebuild-linux-box.sh 1.1.0
-./scripts/rebuild-windows-box.sh 1.1.0
-./scripts/rebuild-runner-box.sh 1.1.0
+# Reconstruir una máquina específica
+dev-forge box rebuild linux --version 1.1.0
+dev-forge box rebuild windows --version 1.1.0
+dev-forge box rebuild runner --version 1.1.0
+
+# O reconstruir todas en secuencia con exclusión mutua de RAM
+dev-forge box rebuild all --version 1.1.0
 ```
 
 ---
 
 ## 5. Empaquetado y Prueba Local con CLI
 
-DevForge integra comandos nativos en su orquestador para gestionar todo el ciclo de vida:
+DevForge integra comandos nativos en su orquestador Rust para gestionar todo el ciclo de vida sin depender de scripts externos:
 
 ```bash
 # Empaquetar la VM forge-linux con disco VDI
@@ -169,36 +173,21 @@ dev-forge box list
 
 ---
 
-## 6. Publicación en Vagrant Cloud (`app.vagrantup.com/olorinj`)
+## 6. Publicación en Vagrant Cloud (`app.vagrantup.com`)
 
-Al enlazar tu cuenta de GitHub (`olorinj`) en **Vagrant Cloud** para Open Source, el namespace oficial es `olorinj`:
+### 6.1 Publicación Automatizada Multiplataforma con `dev-forge box publish`
 
-### 6.1 Publicación Automatizada Multiplataforma (Recomendado)
+La publicación se gestiona directamente desde el orquestador en Rust, con validación previa de sumas SHA-256, modo simulación (`--dry-run`), soporte desatendido para CI/CD (`--yes`), y resolución segura de la organización destino (vía `--user`, variable `DEVFORGE_BOX_ORG` o `VAGRANT_CLOUD_USER`):
 
-DevForge incluye scripts oficiales duales (Bash para Linux/macOS y PowerShell para Windows) con validación previa de sumas SHA-256, modo simulación (`--dry-run`) y soporte desatendido (`-y`):
-
-#### En Linux / macOS (Bash):
 ```bash
 # Simular la publicación de todas las boxes (sin transferir tráfico de red)
-./scripts/publish-boxes.sh 1.0.0 all --dry-run
+dev-forge box publish all --version 1.0.0 --user mi-organizacion --dry-run
 
 # Publicar una box individual (ej. forge-linux)
-./scripts/publish-boxes.sh 1.0.0 linux
+dev-forge box publish linux --version 1.0.0 --user mi-organizacion
 
-# Publicar todas las boxes (linux, windows, runner)
-./scripts/publish-boxes.sh 1.0.0 all
-```
-
-#### En Windows (PowerShell):
-```powershell
-# Simular la publicación de todas las boxes en Windows
-.\scripts\publish-boxes.ps1 -Version 1.0.0 -Target all -DryRun
-
-# Publicar una box individual en Windows
-.\scripts\publish-boxes.ps1 -Version 1.0.0 -Target windows
-
-# Publicar todas las boxes
-.\scripts\publish-boxes.ps1 -Version 1.0.0 -Target all
+# Publicar todas las boxes de forma desatendida para CI/CD o agentes
+dev-forge box publish all --version 1.0.0 --user mi-organizacion --yes
 ```
 
 ---

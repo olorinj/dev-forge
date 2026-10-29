@@ -1303,38 +1303,42 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
     let forge_dir = get_forge_dir();
 
     match action {
+        crate::cli::BoxAction::Rebuild {
+            machine,
+            version,
+            stage,
+            skip_test,
+            out_dir,
+        } => {
+            crate::box_mgr::execute_rebuild(machine, version, stage, *skip_test, out_dir.clone())?;
+        }
+        crate::cli::BoxAction::Publish {
+            machine,
+            version,
+            user,
+            dry_run,
+            release,
+            yes,
+            description,
+            box_dir,
+        } => {
+            crate::box_mgr::execute_publish(crate::box_mgr::PublishOptions {
+                machine: machine.clone(),
+                version: version.clone(),
+                user_arg: user.clone(),
+                dry_run: *dry_run,
+                release: *release,
+                auto_yes: *yes,
+                custom_desc: description.clone(),
+                box_dir: box_dir.clone(),
+            })?;
+        }
         crate::cli::BoxAction::Package {
             machine,
             version,
             out_dir,
         } => {
-            log_info(&format!(
-                "Iniciando empaquetado VDI para '{}' (v{})...",
-                machine, version
-            ));
-            let script_path = forge_dir.join("scripts/package-box-vdi.sh");
-            if !script_path.is_file() {
-                anyhow::bail!(
-                    "No se encontró el script de empaquetado en: {}",
-                    script_path.display()
-                );
-            }
-
-            let mut cmd = Command::new("bash");
-            cmd.arg(&script_path).arg(machine).arg(version);
-            if let Some(out) = out_dir {
-                cmd.arg(out);
-            }
-            cmd.current_dir(&forge_dir);
-            cmd.stdout(Stdio::inherit());
-            cmd.stderr(Stdio::inherit());
-
-            let status = cmd
-                .status()
-                .with_context(|| "Fallo al ejecutar scripts/package-box-vdi.sh")?;
-            if !status.success() {
-                anyhow::bail!("Fallo en el proceso de empaquetado de box");
-            }
+            crate::box_mgr::execute_package(machine, version, out_dir.clone())?;
         }
         crate::cli::BoxAction::Install {
             machine,
@@ -1393,11 +1397,14 @@ pub fn cmd_box(action: &crate::cli::BoxAction) -> Result<()> {
                 })?
             };
 
-            // Tag canónico: olorinj/dev-forge-<machine> (ej: olorinj/dev-forge-linux)
+            let org = std::env::var("DEVFORGE_BOX_ORG")
+                .or_else(|_| std::env::var("VAGRANT_CLOUD_USER"))
+                .unwrap_or_else(|_| "dev-forge".to_string());
+
             let canonical_tag = if actual_machine.starts_with("dev-forge-") {
-                format!("olorinj/{}", actual_machine)
+                format!("{}/{}", org, actual_machine)
             } else {
-                format!("olorinj/dev-{}", actual_machine)
+                format!("{}/dev-{}", org, actual_machine)
             };
 
             log_info(&format!(

@@ -1,6 +1,7 @@
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 
+mod box_mgr;
 mod cache;
 mod cli;
 mod config;
