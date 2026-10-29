@@ -1,21 +1,21 @@
-# Isolated CI/CD Runner Orchestration (GitLab CI/CD)
+# Orquestación de ejecutores de CI/CD aislados (GitLab CI/CD)
 
-This document specifies the architecture and operational procedures for provisioning and executing isolated, reproducible CI/CD pipelines using dedicated guest virtual machines (Bento Debian 12 + Docker) and GitLab Runner.
+Este documento describe la arquitectura y los procedimientos operativos para aprovisionar y ejecutar canalizaciones de CI/CD aisladas y reproducibles mediante máquinas virtuales dedicadas (Bento Debian 12 con Docker) y GitLab Runner.
 
 ---
 
-## 1. Architectural Overview
+## 1. Visión general de la arquitectura
 
-Running complex build and test pipelines on host systems or public shared runners presents significant trade-offs:
-- **Shared Runner Limits**: Public runners often incur minute quotas, lack specialized hypervisor extensions, or expose proprietary code to multi-tenant cloud infrastructure.
-- **Host Contamination**: Running raw CI scripts locally risks polluting host environments with build packages, orphaned containers, and conflicting system libraries.
+Ejecutar flujos complejos de compilación y pruebas directamente en la máquina anfitriona o en ejecutores públicos compartidos plantea compromisos importantes:
+- **Límites en runners compartidos**: Los ejecutores públicos suelen imponer cuotas por minuto, carecen de extensiones especializadas del hipervisor o exponen código propietario en infraestructuras multitenant en la nube.
+- **Contaminación del anfitrión**: Ejecutar scripts de CI en local puede ensuciar el entorno de desarrollo con paquetes residuales, contenedores huérfanos y librerías del sistema incompatibles.
 
-DevForge provides a dedicated, fully isolated runner environment encapsulated in a Bento Debian 12 VirtualBox guest:
-- **Base OS**: `bento/debian-12` (Bookworm).
-- **Compute Sizing**: 4 vCPUs, 4096 MB RAM, 2048 MB Swap disk file.
-- **Container Engine**: Native `docker.io` daemon managed via systemd.
-- **Runner Agent**: Official GitLab Runner (`gitlab-runner`) preconfigured with the Docker executor.
-- **Optional Local GitLab Server**: On-demand containerized GitLab Community Edition (CE) for 100% offline development.
+DevForge proporciona un entorno de ejecución dedicado y completamente aislado dentro de una máquina virtual VirtualBox con Debian 12:
+- **Sistema base**: `bento/debian-12` (Bookworm).
+- **Recursos**: 4 vCPUs, 4096 MB RAM, archivo swap de 2048 MB.
+- **Motor de contenedores**: Demonio nativo `docker.io` gestionado mediante systemd.
+- **Agente de ejecución**: GitLab Runner oficial (`gitlab-runner`) preconfigurado con el ejecutor de Docker.
+- **Servidor GitLab local (opcional)**: Contenedor bajo demanda con GitLab Community Edition (CE) para desarrollo y pruebas 100% desconectadas de internet.
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ flowchart TD
 
 ---
 
-## 2. Vagrant Provisioning Specification
+## 2. Especificación del aprovisionamiento en Vagrant
 
 The runner VM configuration leverages hardware virtualization acceleration and secure daemon permissions:
 
@@ -138,64 +138,64 @@ end
 
 ---
 
-## 3. Operational Workflows
+## 3. Flujos operativos de trabajo
 
-### Managing the Runner via dev-forge CLI
+### Gestión del ejecutor mediante la CLI de dev-forge
 
-DevForge provides dedicated subcommands to manage the runner lifecycle from the host:
+DevForge ofrece comandos dedicados para gestionar el ciclo de vida del runner desde el anfitrión:
 
 ```bash
-# Boot the isolated runner VM
+# Iniciar la máquina virtual del runner
 dev-forge runner up
 
-# Check status
+# Comprobar el estado
 dev-forge runner status
 
-# Interactive SSH session
+# Sesión SSH interactiva
 dev-forge runner ssh
 
-# Register with GitLab instance
+# Registrar el runner en GitLab
 dev-forge runner register <REGISTRATION_TOKEN> [https://gitlab.example.com]
 
-# Start offline local GitLab CE server (:8080)
+# Iniciar servidor local de GitLab CE (:8080)
 dev-forge runner start-gitlab
 
-# Halt runner to release host RAM
+# Detener el runner para liberar RAM en el host
 dev-forge runner halt
 ```
 
-### Registering with a Remote Project
-1. Obtain the registration token from GitLab (**Settings $\rightarrow$ CI/CD $\rightarrow$ Runners**).
-2. Register the runner using the DevForge CLI:
+### Registro con un proyecto remoto
+1. Obtén el token de registro en GitLab (**Settings $\rightarrow$ CI/CD $\rightarrow$ Runners**).
+2. Registra el ejecutor mediante la CLI de DevForge:
    ```bash
    dev-forge runner register <REGISTRATION_TOKEN> [https://gitlab.example.com]
    ```
-   Or directly inside the VM:
+   O directamente dentro de la máquina virtual:
    ```bash
    dev-forge runner ssh -c "sudo register-runner <REGISTRATION_TOKEN> [https://gitlab.example.com]"
    ```
 
-### 100% Offline Air-Gapped Operation
-To test pipelines completely offline:
-1. Start the containerized GitLab Community Edition server:
+### Operación 100% aislada y sin conexión a internet
+Para probar canalizaciones de integración de forma totalmente offline:
+1. Inicia el servidor GitLab Community Edition en contenedor:
    ```bash
    dev-forge runner start-gitlab
    ```
-2. Navigate to `http://localhost:8080` on the host machine.
-3. Retrieve root credentials:
+2. Accede a `http://localhost:8080` desde el navegador de la máquina host.
+3. Obtén la contraseña inicial del usuario administrador (`root`):
    ```bash
    dev-forge runner ssh -c "sudo docker exec -it gitlab grep 'Password:' /etc/gitlab/initial_root_password"
    ```
-4. Push project repositories to the local instance and link the runner via `http://localhost`.
+4. Envía los repositorios del proyecto a la instancia local y enlaza el runner a través de `http://localhost`.
 
 ---
 
-## 4. Resource Teardown and Lifecycle Management
-* **Clean Shutdown**:
+## 4. Desmantelamiento y gestión del ciclo de vida
+* **Apagado limpio**:
   ```bash
   dev-forge runner halt
   ```
-* **Vagrant Direct Control**:
+* **Control directo con Vagrant**:
   ```bash
   vagrant halt forge-runner
   vagrant destroy -f forge-runner

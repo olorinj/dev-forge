@@ -1,4 +1,4 @@
-# Guía de Custom Boxes de Despliegue Instantáneo (DevForge)
+# Guía de custom boxes de despliegue instantáneo (DevForge)
 
 Esta guía documenta la arquitectura, optimizaciones, procedimiento de empaquetado y publicación de las imágenes virtuales oficiales de DevForge (`forge-linux`, `forge-windows` y `forge-runner`) empaquetadas conforme al estándar nativo oficial de Vagrant para máxima compatibilidad y arranque instantáneo.
 
@@ -43,7 +43,7 @@ flowchart TD
 
 ---
 
-## 1. Imágenes de Origen y Atribución Upstream
+## 1. Imágenes de origen y atribución upstream
 
 DevForge construye sus entornos aislados sobre cajas base mantenidas por la comunidad de software libre. Se preserva y documenta su atribución original:
 
@@ -55,11 +55,11 @@ DevForge construye sus entornos aislados sobre cajas base mantenidas por la comu
 
 ---
 
-## 2. Optimizaciones de Hardening y Poda Aplicadas
+## 2. Optimizaciones de reducción de tamaño y seguridad
 
 Para garantizar compilaciones 100% deterministas, arranques instantáneos (~15 segundos) y mínima huella en disco:
 
-### 2.1 Cero Actualizaciones Automáticas
+### 2.1 Desactivación de actualizaciones automáticas
 - **Linux (`forge-linux` / `forge-runner`)**:
   - Enmascaramiento completo y permanente (`systemctl mask`) de `unattended-upgrades.service`, `apt-daily.timer`, `apt-daily.service`, `apt-daily-upgrade.timer` y `apt-daily-upgrade.service`.
   - Configuración estricta en `/etc/apt/apt.conf.d/99devforge-no-periodic-updates` anulando toda descarga o actualización desatendida.
@@ -68,29 +68,29 @@ Para garantizar compilaciones 100% deterministas, arranques instantáneos (~15 s
   - Deshabilitación de todas las tareas programadas de update (`\Microsoft\Windows\WindowsUpdate\*`).
   - Fijación forzada en el Registro de la directiva de grupo `NoAutoUpdate = 1` y `AUOptions = 1`.
 
-### 2.2 Política Estricta de un Solo Núcleo de Kernel Activo (Linux)
+### 2.2 Política estricta de un solo núcleo de kernel activo (Linux)
 - El script de preparación inspecciona el kernel en ejecución con `uname -r`.
 - Purga automáticamente todos los paquetes `linux-image-*` y `linux-headers-*` secundarios u obsoletos acumulados.
 - Regenera el initramfs y actualiza GRUB (`update-grub`), garantizando que `/boot` y `/lib/modules` alberguen estrictamente **un único kernel limpio**, reduciendo drásticamente el tamaño del disco y evitando inconsistencias en arranque.
 
-### 2.3 Poda de Servicios Innecesarios
+### 2.3 Poda de servicios innecesarios
 - **Linux**: Desactivación y enmascaramiento de `bluetooth`, `cups` (impresoras), `avahi-daemon` (mDNS), `modemmanager`, `whoopsie`/`apport` (telemetría), `sleep.target`, `suspend.target`, `hibernate.target` y `systemd-timesyncd` (la hora se sincroniza directamente por el hypervisor VirtualBox).
 - **Windows**: Desactivación de Windows Search Indexing (`WSearch`), Superfetch (`SysMain`), cola de impresión (`Spooler`), telemetría (`DiagTrack`) y reporte de errores (`WerSvc`).
-- **Limpieza de Almacén WinSxS**: Ejecución de `dism.exe /online /cleanup-image /startcomponentcleanup /resetbase` y eliminación de puntos de restauración VSS (`vssadmin delete shadows /all /quiet`).
+- **Limpieza de almacén WinSxS**: Ejecución de `dism.exe /online /cleanup-image /startcomponentcleanup /resetbase` y eliminación de puntos de restauración VSS (`vssadmin delete shadows /all /quiet`).
 
-### 2.4 Llenado de Ceros y Empaquetado Estándar Vagrant
+### 2.4 Llenado de ceros y empaquetado estándar Vagrant
 - **Linux**: Rellenado de espacio no asignado con `dd if=/dev/zero of=/EMPTY bs=1M; sync; rm -f /EMPTY`.
 - **Windows**: Rellenado de bloques libres mediante Sysinternals `sdelete.exe -z C:`.
 - **Restauración SSH**: Inyección de la clave pública insegura oficial de Vagrant en `/home/vagrant/.ssh/authorized_keys` para garantizar que cualquier host se autentique sin timeouts en el primer arranque.
-- **Empaquetado Oficial**: Empaquetado mediante `vagrant package` generando discos OVF compatibles (StreamOptimized) que se importan de forma instantánea sin incompatibilidades de formato de disco en ninguna versión de VirtualBox.
+- **Empaquetado oficial**: Empaquetado mediante `vagrant package` generando discos OVF compatibles (StreamOptimized) que se importan de forma instantánea sin incompatibilidades de formato de disco en ninguna versión de VirtualBox.
 
 ---
 
-## 3. Estrategia de Dos Capas: Cómo Ampliar o Modificar las Boxes a Posteriori
+## 3. Estrategia de dos capas: cómo ampliar o modificar las boxes a posteriori
 
 Las boxes pre-compiladas **no congelan** los entornos. El flujo recomendado para añadir nuevos lenguajes (ej. Swift, Zig, Haskell, .NET) se estructura en dos fases:
 
-### Fase 1: Prototipado Rápido con Ansible en Git (1 a 2 minutos)
+### Fase 1: prototipado rápido con Ansible en Git (1 a 2 minutos)
 1. La **Fuente de la Verdad** es el repositorio Git. Añades la tarea o receta de instalación del nuevo lenguaje en `provision/ansible/linux.yml` o `provision/ansible/windows.yml`.
 2. Ejecutas el aprovisionamiento sobre tu VM activa:
    ```bash
@@ -99,7 +99,7 @@ Las boxes pre-compiladas **no congelan** los entornos. El flujo recomendado para
 3. Ansible detectará que los lenguajes existentes ya están presentes (idempotencia) e instalará **únicamente** el nuevo lenguaje.
 4. Puedes compilar y probar proyectos en tu entorno de inmediato.
 
-### Fase 2: Congelación y Publicación de Nueva Versión
+### Fase 2: congelación y publicación de nueva versión
 Cuando el nuevo lenguaje esté validado (por ejemplo, compilando un ejemplo en `examples/hashforge/`):
 ```bash
 dev-forge box package forge-linux --version 1.1.0
@@ -108,19 +108,19 @@ El CLI ejecutará la poda, purga de kernels, zeroing, compactación VDI, generar
 
 ---
 
-## 4. Reconstrucción Autónoma y Flujo por Etapas (Scripts de Rebuild)
+## 4. Reconstrucción autónoma y flujo por etapas
 
-Los scripts en `scripts/` ofrecen dos flujos de trabajo: ejecución total desatendida o ejecución por etapas (`--deploy-only` y `--package-only`) para iterar antes de congelar una nueva versión:
+La CLI de `dev-forge` ofrece dos flujos de trabajo: ejecución total desatendida o ejecución por etapas (`--stage deploy-only` y `--stage package-only`) para iterar antes de congelar una nueva versión:
 
 ```mermaid
 flowchart LR
-    A["Ejecutar --deploy-only"] --> B["VM Lista & Viva"]
+    A["Ejecutar --stage deploy-only"] --> B["VM Lista & Viva"]
     B --> C["Añadir SDKs / Cambios Manuales"]
-    C --> D["Ejecutar --package-only"]
+    C --> D["Ejecutar --stage package-only"]
     D --> E["Box vX.Y.Z Lista"]
 ```
 
-### 4.1 Flujo por Etapas (Iteración y Modificaciones Previas)
+### 4.1 Flujo por etapas (iteración y modificaciones previas)
 1. **Desplegar en limpio y detenerse antes de optimizar**:
    ```bash
    dev-forge box rebuild linux --version 1.1.0 --stage deploy-only
@@ -140,7 +140,7 @@ flowchart LR
    dev-forge box rebuild windows --version 1.1.0 --stage package-only
    ```
 
-### 4.2 Flujo Directo de Reconstrucción Total
+### 4.2 Flujo directo de reconstrucción total
 ```bash
 # Reconstruir una máquina específica
 dev-forge box rebuild linux --version 1.1.0
@@ -153,7 +153,7 @@ dev-forge box rebuild all --version 1.1.0
 
 ---
 
-## 5. Empaquetado y Prueba Local con CLI
+## 5. Empaquetado y prueba local con la CLI
 
 DevForge integra comandos nativos en su orquestador Rust para gestionar todo el ciclo de vida sin depender de scripts externos:
 
@@ -175,7 +175,7 @@ dev-forge box list
 
 ## 6. Publicación en Vagrant Cloud (`app.vagrantup.com`)
 
-### 6.1 Publicación Automatizada Multiplataforma con `dev-forge box publish`
+### 6.1 Publicación automatizada multiplataforma con `dev-forge box publish`
 
 La publicación se gestiona directamente desde el orquestador en Rust, con validación previa de sumas SHA-256, modo simulación (`--dry-run`), soporte desatendido para CI/CD (`--yes`), y resolución segura de la organización destino (vía `--user`, variable `DEVFORGE_BOX_ORG` o `VAGRANT_CLOUD_USER`):
 
@@ -192,7 +192,7 @@ dev-forge box publish all --version 1.0.0 --user mi-organizacion --yes
 
 ---
 
-### 6.2 Publicación Manual Directa vía Vagrant CLI
+### 6.2 Publicación manual directa vía Vagrant CLI
 
 1. **Iniciar sesión en Vagrant Cloud desde la terminal**:
    ```bash
@@ -203,25 +203,25 @@ dev-forge box publish all --version 1.0.0 --user mi-organizacion --yes
 2. **Crear y subir la versión de la box**:
    ```bash
    # Para forge-linux
-   vagrant cloud publish olorinj/dev-forge-linux 1.0.0 virtualbox dist/boxes/dev-forge-linux-v1.0.0.box \
+   vagrant cloud publish mi-org/dev-forge-linux 1.0.0 virtualbox dist/boxes/dev-forge-linux-v1.0.0.box \
        --description "DevForge Linux Native Build Box (Debian 12 + Rust/Go/Node/Java/Docker/VDI)" \
        --version-description "Release v1.0.0: Pre-baked toolchains, zero auto-updates, single active kernel." \
        --release
 
    # Para forge-windows
-   vagrant cloud publish olorinj/dev-forge-windows 1.0.0 virtualbox dist/boxes/dev-forge-windows-v1.0.0.box \
+   vagrant cloud publish mi-org/dev-forge-windows 1.0.0 virtualbox dist/boxes/dev-forge-windows-v1.0.0.box \
        --description "DevForge Windows Native Build Box (WinServer 2022 Core + MSVC/WiX/Inno/VDI)" \
        --version-description "Release v1.0.0: Pre-baked Visual Studio 2022 Build Tools, WiX 3.14, InnoSetup." \
        --release
 
    # Para forge-runner
-   vagrant cloud publish olorinj/dev-forge-runner 1.0.0 virtualbox dist/boxes/dev-forge-runner-v1.0.0.box \
+   vagrant cloud publish mi-org/dev-forge-runner 1.0.0 virtualbox dist/boxes/dev-forge-runner-v1.0.0.box \
        --description "DevForge CI/CD Runner Box (Debian 12 + GitLab Runner + Docker Engine)" \
        --version-description "Release v1.0.0: Isolated local CI/CD execution environment." \
        --release
    ```
 
-### 6.3 Alternativa: Alojamiento Directo en GitHub Releases
+### 6.3 Alternativa: alojamiento directo en GitHub Releases
 Si prefieres no usar el registro central de HashiCorp, puedes subir los archivos `.box` como activos adjuntos a un Release de GitHub (`https://github.com/olorinj/dev-forge/releases/tag/v1.0.0`).
 
 Vagrant puede consumir directamente el manifiesto de catálogo JSON versionado ubicado en `config/boxes/metadata-linux.json`:

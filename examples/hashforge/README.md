@@ -1,4 +1,4 @@
-# HashForge - Suite de Validación Multi-Lenguaje y Multi-VM
+# HashForge - Suite de validación multilenguaje y multi-VM
 
 **HashForge** es una suite criptográfica (CLI y GUI) desarrollada como banco de pruebas integral para verificar la capacidad del orquestador **`dev-forge`** de compilar ejecutables nativos en múltiples lenguajes de programación a través de máquinas virtuales aisladas (**Linux** y **Windows**).
 
@@ -35,7 +35,7 @@ flowchart TD
 
 ---
 
-## 1. Implementaciones Disponibles
+## 1. Implementaciones disponibles
 
 | Directorio | Lenguaje | GUI / CLI | Sistema de Construcción | Binario Linux | Binario Windows |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -49,7 +49,7 @@ flowchart TD
 
 ---
 
-## 2. Compilación Individual de Lenguajes con `dev-forge`
+## 2. Compilación individual de lenguajes con `dev-forge`
 
 ```bash
 # Compilar Rust para Linux en forge-linux
@@ -76,7 +76,7 @@ dev-forge build -p examples/hashforge/node -t all
 
 ---
 
-## 3. Ejecución de Pruebas Automatizadas
+## 3. Ejecución de pruebas automatizadas
 
 Cada subcarpeta de lenguaje contiene su propio `test.sh` y `test.ps1`. Adicionalmente, el directorio raíz de `hashforge` cuenta con un **orquestador maestro de pruebas**:
 

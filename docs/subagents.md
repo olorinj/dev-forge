@@ -1,10 +1,10 @@
-# Arquitectura y Flujo de Trabajo con Subagentes en `dev-forge`
+# Arquitectura y flujo de trabajo con subagentes en `dev-forge`
 
-Este documento describe la integración de **Subagentes Especializados** en el ecosistema `dev-forge`, materializando las directrices de [`AGENTS.md`](file:///home/olorinj/DEV/dev-forge/.agents/AGENTS.md) y los roles definidos en `.agents/roles/` dentro de un modelo de orquestación desacoplado.
+Este documento describe la integración de **subagentes especializados** en el ecosistema `dev-forge`, materializando las directrices de [`AGENTS.md`](file:///home/olorinj/DEV/dev-forge/.agents/AGENTS.md) y los roles definidos en `.agents/roles/` dentro de un modelo de orquestación desacoplado.
 
 ---
 
-## 1. Motivación y Principios
+## 1. Motivación y principios
 
 En proyectos con múltiples toolchains, compilación cruzada, interfaces gráficas de alto rendimiento (Tauri/egui) y estrictos estándares de seguridad, un modelo de agente monolítico presenta dos cuellos de botella críticos:
 
@@ -42,66 +42,66 @@ flowchart TD
 
 ---
 
-## 2. Catálogo de Subagentes Especializados
+## 2. Catálogo de subagentes especializados
 
 ### 2.1. `tauri-ui-specialist`
 * **Definición**: Especialista en desarrollo frontend y backend IPC para aplicaciones de escritorio Tauri (Rust + Svelte/Tailwind CSS/Vite).
 * **Rol de referencia**: [tauri-ui-agent.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/tauri-ui-agent.md).
 * **Invariantes que supervisa**:
-  - **Experiencia de Escritorio Nativa**: Barras de título personalizadas, zonas de arrastre (`data-tauri-drag-region`), anulación de menús contextuales de navegador innecesarios.
-  - **Estética Moderna**: Layouts estilo Bento Box, translucidez sutil (glassmorphism), microinteracciones y filosofía *Dark Mode First*.
-  - **Seguridad Zero-Trust**: Validación estricta en Rust de todo payload proveniente del frontend; prohibición de `eval()` o scripts remotos.
-  - **Simetría y Feedback**: En interfaces bidireccionales (ej. cifrado/descifrado, ofuscación), garantiza señales de completado equivalentes (toasts con conteo de elementos y tiempo en ms).
+  - **Experiencia de escritorio nativa**: Barras de título personalizadas, zonas de arrastre (`data-tauri-drag-region`), anulación de menús contextuales de navegador innecesarios.
+  - **Estética moderna**: Distribución limpia estilo Bento Box, translucidez sutil (glassmorphism), microinteracciones y diseño enfocado en modo oscuro por defecto.
+  - **Seguridad de confianza cero (Zero-Trust)**: Validación estricta en Rust de todo payload proveniente del frontend; prohibición de `eval()` o scripts remotos.
+  - **Simetría y retroalimentación**: En interfaces bidireccionales (ej. cifrado/descifrado, ofuscación), garantiza señales de completado equivalentes (avisos con conteo de elementos y tiempo en ms).
 
 ### 2.2. `quality-gate-auditor`
-* **Definición**: Auditor estricto de QA, Seguridad, ReDoS y Pre-Flight Quality Gate.
+* **Definición**: Auditor estricto de QA, seguridad, prevención de ReDoS y control de calidad previo a la integración.
 * **Roles de referencia**: [quality-gate-auditor.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/quality-gate-auditor.md), [security-auditor.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/security-auditor.md) y [qa-fuzzer.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/qa-fuzzer.md).
 * **Invariantes que supervisa**:
-  - **Pre-Flight Quality Gate (Mandatorio)**:
-    1. *Formatting*: `cargo fmt --all -- --check` / `ruff format --check .`.
-    2. *Strict Linting*: Cero errores y cero advertencias (`cargo clippy --all-targets --all-features -- -D warnings`). Verificación de `#![warn(clippy::pedantic)]`.
-    3. *Zero Regression*: Ejecución de suites de prueba (`cargo test -q`) con 100% de éxito.
-    4. *Diff Verification*: Inspección de `git diff` para evitar cambios espurios.
-  - **Cero Pánicos en Rust**: Erradicación de `unwrap()` y `expect()` en código de producción.
-  - **Prevención ReDoS**: Detección de cuantificadores anidados o backtracking catastrófico en expresiones regulares.
-  - **Higiene CLI Unix**: Verificación de que `stdout` se reserve exclusivamente para flujos de datos puros y `stderr` para logs.
+  - **Control de calidad previo al commit (mandatorio)**:
+    1. *Formateo*: `cargo fmt --all -- --check` / `ruff format --check .`.
+    2. *Análisis estricto*: Cero errores y cero advertencias (`cargo clippy --all-targets --all-features -- -D warnings`). Verificación de `#![warn(clippy::pedantic)]`.
+    3. *Cero regresiones*: Ejecución de suites de prueba (`cargo test -q`) con 100% de éxito.
+    4. *Verificación de cambios*: Inspección de `git diff` para evitar modificaciones espurias.
+  - **Cero pánicos en Rust**: Erradicación de `unwrap()` y `expect()` en código de producción.
+  - **Prevención de ReDoS**: Detección de cuantificadores anidados o retroceso catastrófico en expresiones regulares.
+  - **Higiene de CLI en Unix**: Verificación de que `stdout` se reserve exclusivamente para flujos de datos puros y `stderr` para logs.
 
 ### 2.3. `native-packager`
-* **Definición**: Especialista en empaquetado nativo multiplataforma, generación de instaladores y cosecha de artefactos en `dist/`.
+* **Definición**: Especialista en empaquetado nativo multiplataforma, generación de instaladores y recolección de artefactos en `dist/`.
 * **Rol de referencia**: [packager.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/packager.md).
 * **Invariantes que supervisa**:
-  - **Generación Dual de Instaladores Windows**: Paquete corporativo `.msi` (WiX Toolset) e instalador wizard `-setup.exe` (Inno Setup).
-  - **Sanitización Estricta de Versiones WiX**: Conversión de semver a formato `major.minor.build` numérico estricto (`major <= 255`, `minor <= 255`, `build <= 65535`) para evitar fallos de compilación MSI.
-  - **Invariante Criptográfica Anti-Colisión GUI vs CLI**: Cálculo del hash SHA-256 del binario CLI para garantizar que ningún binario empaquetado como GUI comparta el mismo hash o nombre. Prohibición estricta de enmascarar binarios CLI como aplicaciones GUI.
-  - **Higiene AppImage y FUSE**: Exportación de `APPIMAGE_EXTRACT_AND_RUN=1` y `NO_STRIP=1` en entornos headless/CI sin privilegios FUSE.
-  - **Inyección de Metadatos y Recursos**: Integración de iconos de alta resolución (`icon.ico` multirresolución 16x16 a 256x256) y metadatos de versión PE respetando `DISABLE_WINRES=1` para evitar colisiones con `tauri-build`.
+  - **Generación dual de instaladores para Windows**: Paquete corporativo `.msi` (WiX Toolset) e instalador guiado `-setup.exe` (Inno Setup).
+  - **Saneamiento estricto de versiones WiX**: Conversión de semver a formato `major.minor.build` numérico estricto (`major <= 255`, `minor <= 255`, `build <= 65535`) para evitar fallos de compilación MSI.
+  - **Invariante criptográfica anticolisión GUI frente a CLI**: Cálculo del hash SHA-256 del binario de la CLI para garantizar que ningún binario empaquetado como GUI comparta el mismo hash o nombre. Prohibición estricta de enmascarar binarios CLI como aplicaciones GUI.
+  - **Higiene de AppImage y FUSE**: Exportación de `APPIMAGE_EXTRACT_AND_RUN=1` y `NO_STRIP=1` en entornos headless/CI sin privilegios FUSE.
+  - **Inyección de metadatos y recursos**: Integración de iconos de alta resolución (`icon.ico` multirresolución 16x16 a 256x256) y metadatos de versión PE respetando `DISABLE_WINRES=1` para evitar colisiones con `tauri-build`.
 
 ### 2.4. `vagrant-virtualization-architect`
 * **Definición**: Arquitecto de infraestructura virtualizada, hipervisores (VirtualBox) y orquestación hermética multientorno vía Vagrant.
-* **Roles y Reglas de referencia**: [vagrant-architect.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/vagrant-architect.md), [virtualization.md](file:///home/olorinj/DEV/dev-forge/.agents/rules/core/virtualization.md) y [dev-forge.md](file:///home/olorinj/DEV/dev-forge/.agents/rules/projects/dev-forge.md).
+* **Roles y reglas de referencia**: [vagrant-architect.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/vagrant-architect.md), [virtualization.md](file:///home/olorinj/DEV/dev-forge/.agents/rules/core/virtualization.md) y [dev-forge.md](file:///home/olorinj/DEV/dev-forge/.agents/rules/projects/dev-forge.md).
 * **Invariantes que supervisa**:
-  - **Zero Shared-Folder Compilation**: Prohibición de compilación directa en carpetas compartidas (`vboxsf`). Redirección mandatoria de caches efímeras (`CARGO_TARGET_DIR="/tmp/devforge-target"`, CMake `/tmp/build`, Go `/tmp/go-cache`, `C:\target` en Windows).
-  - **Aceleración Hardware VirtIO & I/O Caching**: Asignación obligatoria de `virtio-net` y almacenamiento con `--hostiocache on` / `cache: "writeback"`.
-  - **Compatibilidad Controladoras Windows (Evitar Bug NVMe #126)**: Aplicación exclusiva de controladoras SATA (AHCI) con flags SSD (`--nonrotational on`) en guests Windows.
-  - **Sincronización Dinámica de Teclado del Host**: Detección de distribución de teclado del anfitrión e inyección automática en el guest (`Set-WinUserLanguageList` en Windows, `localectl` en Linux).
-  - **Aislamiento Out-of-Tree de Vagrant**: Aplicación estricta de `VAGRANT_CWD` y `VAGRANT_DOTFILE_PATH` en la raíz de `dev-forge` para mantener los repositorios de clientes libres de metadatos `.vagrant`.
-  - **Política de Resiliencia y Teardown Dual**:
-    - Si falla una optimización de kernel/SO, invoca rollback automático (`optimize-levelN.sh --rollback`) conforme a la invariante HashForge.
-    - Si falla un build normal, apaga la VM de inmediato (`vagrant halt` / ACPI) para liberar memoria y recursos del host, a menos que el usuario haya indicado explícitamente `--keep-vm` (`-k`).
+  - **Cero compilación en carpetas compartidas**: Prohibición de compilación directa en carpetas compartidas (`vboxsf`). Redirección mandatoria de cachés efímeras (`CARGO_TARGET_DIR="/tmp/devforge-target"`, CMake `/tmp/build`, Go `/tmp/go-cache`, `C:\target` en Windows).
+  - **Aceleración por hardware con VirtIO y caché de I/O**: Asignación obligatoria de `virtio-net` y almacenamiento con `--hostiocache on` / `cache: "writeback"`.
+  - **Compatibilidad de controladoras en Windows (evitar bug NVMe #126)**: Aplicación exclusiva de controladoras SATA (AHCI) con flags SSD (`--nonrotational on`) en huéspedes Windows.
+  - **Sincronización dinámica de teclado del anfitrión**: Detección de distribución de teclado del anfitrión e inyección automática en el huésped (`Set-WinUserLanguageList` en Windows, `localectl` en Linux).
+  - **Aislamiento de Vagrant fuera del árbol**: Aplicación estricta de `VAGRANT_CWD` y `VAGRANT_DOTFILE_PATH` en la raíz de `dev-forge` para mantener los repositorios de clientes libres de metadatos `.vagrant`.
+  - **Política de resiliencia y apagado dual**:
+    - Si falla una optimización de kernel/SO, invoca reversión automática (`optimize-levelN.sh --rollback`) conforme a la invariante HashForge.
+    - Si falla una compilación normal, apaga la VM de inmediato (`vagrant halt` / ACPI) para liberar memoria y recursos del host, a menos que el usuario haya indicado explícitamente `--keep-vm` (`-k`).
 
 ### 2.5. `documentation-specialist`
-* **Definición**: Especialista en sincronización continua entre código fuente, manuales de usuario, arquitectura y changelog semántico.
+* **Definición**: Especialista en sincronización continua entre código fuente, manuales de usuario, arquitectura y registro de cambios semántico.
 * **Rol de referencia**: [documentation-specialist.md](file:///home/olorinj/DEV/dev-forge/.agents/roles/common/documentation-specialist.md).
 * **Invariantes que supervisa**:
-  - **Separación Estricta README vs `docs/`**: El `README.md` se reserva estrictamente al usuario final (propósito, instalación de 1 línea, quickstart, uso del CLI). Todo detalle técnico profundo (compiladores cruzados, flags de hipervisor, regex, pipelines) pertenece a `docs/`.
-  - **Sincronización de Arquitectura Visual**: Garantiza que todo cambio en nodos, topologías de VM o flujo de empaquetado actualice inmediatamente los diagramas Mermaid (`flowchart`, `sequenceDiagram`).
-  - **Changelog Semántico (*Keep a Changelog*)**: Mantiene `CHANGELOG.md` al día bajo `[Unreleased]` categorizando rigurosamente en `Added`, `Changed`, `Fixed` y `Security`.
-  - **Paridad y Ayuda CLI**: Verifica que cualquier flag o subcomando añadido en Rust o Python esté reflejado con exactitud en la documentación en Bash y PowerShell.
-  - **Integridad de Enlaces**: Comprueba que todos los enlaces relativos y anclas existan y no generen 404s.
+  - **Separación estricta de README frente a `docs/`**: El `README.md` se reserva estrictamente al usuario final (propósito, instalación, uso rápido y de la CLI). Todo detalle técnico profundo (compiladores cruzados, flags de hipervisor, expresiones regulares, pipelines) pertenece a `docs/`.
+  - **Sincronización de arquitectura visual**: Garantiza que todo cambio en nodos, topologías de VM o flujo de empaquetado actualice inmediatamente los diagramas Mermaid (`flowchart`, `sequenceDiagram`).
+  - **Registro de cambios semántico (*Keep a Changelog*)**: Mantiene `CHANGELOG.md` al día bajo `[Unreleased]` categorizando rigurosamente en `Added`, `Changed`, `Fixed` y `Security`.
+  - **Paridad y ayuda en CLI**: Verifica que cualquier flag o subcomando añadido en Rust o Python esté reflejado con exactitud en la documentación en Bash y PowerShell.
+  - **Integridad de enlaces**: Comprueba que todos los enlaces relativos y anclas existan y no generen errores de destino no encontrado.
 
 ---
 
-## 3. Matriz de Disparo y Umbrales de Delegación (Trigger Policy)
+## 3. Matriz de disparo y umbrales de delegación (trigger policy)
 
 Para garantizar un balance óptimo entre velocidad y aislamiento de contexto, el Orquestador aplica la siguiente política determinista de invocación:
 
@@ -117,14 +117,14 @@ flowchart TD
     Check -->|Cambio menor < 30 líneas o consulta conceptual| Direct["Resolver en hilo principal (baja latencia)"]
 ```
 
-### Reglas Cuantitativas de Activación
-1. **Regla del Context Window**: Toda operación que anticipe generar más de 20 líneas de salida de compilador, linter o hypervisor (`cargo clippy`, `cargo test`, `vagrant up`, `wix`) debe ejecutarse en subagente.
-2. **Puerta de Entrada Obligatoria**: Ningún commit local puede crearse sin la aprobación explícita de `quality-gate-auditor`.
-3. **Exploración Limpia**: Todo análisis cruzado de repositorios externos (LexiShield, Academia, etc.) debe realizarse mediante el subagente nativo `research` en modo solo lectura.
+### Reglas cuantitativas de activación
+1. **Regla de la ventana de contexto**: Toda operación que anticipe generar más de 20 líneas de salida de compilador, linter o hypervisor (`cargo clippy`, `cargo test`, `vagrant up`, `wix`) debe ejecutarse en subagente.
+2. **Puerta de entrada obligatoria**: Ningún commit local puede crearse sin la aprobación explícita de `quality-gate-auditor`.
+3. **Exploración limpia**: Todo análisis cruzado de repositorios externos (LexiShield, Academia, etc.) debe realizarse mediante el subagente nativo `research` en modo solo lectura.
 
 ---
 
-## 4. Secuencia de Operación Típica
+## 4. Secuencia de operación típica
 
 ```mermaid
 sequenceDiagram
@@ -153,7 +153,7 @@ sequenceDiagram
 
 ---
 
-## 5. Mejoras Directas en el Flujo de Desarrollo
+## 5. Mejoras directas en el flujo de desarrollo
 
 | Dimensión | Enfoque Monolítico Anterior | Con Subagentes Especializados |
 | :--- | :--- | :--- |

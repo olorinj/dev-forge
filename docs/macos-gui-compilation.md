@@ -1,10 +1,10 @@
-# Compilación y Firmado de GUIs macOS desde Linux
+# Compilación y firmado de interfaces gráficas para macOS desde Linux
 
-Este documento explica en detalle cómo `dev-forge` permite compilar aplicaciones completas con Interfaz Gráfica de Usuario (GUI) en formatos `.app` y `.dmg` para macOS directamente desde la máquina virtual Linux, sin necesidad de disponer de hardware Apple físico.
+Este documento explica en detalle cómo `dev-forge` permite compilar aplicaciones completas con interfaz gráfica de usuario (GUI) en formatos `.app` y `.dmg` para macOS directamente desde la máquina virtual Linux, sin necesidad de disponer de hardware Apple físico.
 
 ---
 
-## 1. Fundamentos Técnicos del Empaquetado macOS
+## 1. Fundamentos técnicos del empaquetado para macOS
 
 A diferencia de un ejecutable de Windows (`.exe`) o de Linux (ELF plano), una aplicación de macOS para el usuario final es un directorio estructurado (*bundle*):
 
@@ -23,7 +23,7 @@ Dado que esta estructura es un estándar de carpetas y ficheros XML, **puede ser
 
 ---
 
-## 2. Componentes del Pipeline en `dev-forge`
+## 2. Componentes del flujo de trabajo en `dev-forge`
 
 ```mermaid
 flowchart LR

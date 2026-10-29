@@ -1,4 +1,4 @@
-# Lenguajes y Ecosistemas Soportados en `dev-forge`
+# Lenguajes y ecosistemas soportados en `dev-forge`
 
 `dev-forge` incluye en sus máquinas virtuales los entornos de compilación y empaquetado para los principales lenguajes de desarrollo de software:
 
@@ -14,40 +14,40 @@
 
 ---
 
-## 1. Ejemplos de Invocación
+## 1. Ejemplos de invocación
 
-### Proyecto en Rust (o Rust + Tauri):
+### Proyecto en Rust (o Rust + Tauri)
 ```bash
 dev-forge build -p /home/usuario/DEV/rust/lexishield -t all
 ```
 
-### Proyecto en Python con Nuitka (Mitigación EDR/Antivirus):
+### Proyecto en Python con Nuitka (mitigación de antivirus y EDR)
 ```bash
 dev-forge build -p /home/usuario/DEV/mi-script -t windows --compiler nuitka
 ```
 
-### Proyecto en Java:
+### Proyecto en Java
 ```bash
 dev-forge build -p /home/usuario/DEV/mi-app-java -t linux
 ```
 
-### Proyecto en Go:
+### Proyecto en Go
 ```bash
 dev-forge build -p /home/usuario/DEV/mi-microservicio -t linux
 ```
 
 ---
 
-## 2. Compilación de Aplicaciones de Escritorio para macOS
+## 2. Compilación de aplicaciones de escritorio para macOS
 
 `dev-forge` incluye capacidades para compilar binarios y bundles de escritorio para macOS directamente desde `forge-linux`:
-- **macOS de Escritorio**: Compilación cruzada completa de binarios Mach-O, bundles `.app` y empaquetado en imágenes `.dmg` con `osxcross` y `dmgbuild`.
-- **Librerías Nativas**: Compilación de lógica en Rust (`aarch64-apple-darwin` / `x86_64-apple-darwin`) o C/C++ utilizables en proyectos macOS.
-- **Firmado Criptográfico**: Herramienta `rcodesign` en `forge-linux` para firmar paquetes y bundles desde Linux.
+- **macOS de escritorio**: Compilación cruzada completa de binarios Mach-O, bundles `.app` y empaquetado en imágenes `.dmg` con `osxcross` y `dmgbuild`.
+- **Bibliotecas nativas**: Compilación de lógica en Rust (`aarch64-apple-darwin` / `x86_64-apple-darwin`) o C/C++ utilizables en proyectos macOS.
+- **Firmado criptográfico**: Herramienta `rcodesign` en `forge-linux` para firmar paquetes y bundles desde Linux.
 
 ---
 
-## 3. Compilación Resistente a Antivirus/EDR con Nuitka
+## 3. Compilación resistente a antivirus y soluciones EDR con Nuitka
 
 Para aplicaciones en Python distribuidas en entornos corporativos o Windows donde herramientas tradicionales como PyInstaller sufren falsos positivos por heurística:
 - Selecciona Nuitka mediante `--compiler nuitka` en el comando `build`.
@@ -56,7 +56,7 @@ Para aplicaciones en Python distribuidas en entornos corporativos o Windows dond
 
 ---
 
-## 4. Configuración de Entornos de Desarrollo en VS Code
+## 4. Configuración de entornos de desarrollo en VS Code
 
 `dev-forge` permite convertir la máquina virtual `forge-linux` en un entorno de desarrollo interactivo para VS Code con todas las cadenas de herramientas nativas:
 ```bash

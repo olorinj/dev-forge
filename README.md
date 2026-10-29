@@ -1,12 +1,12 @@
-# dev-forge 🔨
+# dev-forge
 
-> **Forja Universal de Compilación y Desarrollo Multiplataforma (100% Offline)**
+> **Forja universal de compilación y desarrollo multiplataforma (100% offline)**
 
 `dev-forge` es un orquestador autónomo diseñado para compilar y empaquetar aplicaciones en múltiples lenguajes (**Rust, Java, Python, Go, Node.js y C/C++**) hacia múltiples plataformas (**Linux, Windows nativo con MSVC y macOS**) mediante entornos virtualizados limpios y aislados, sin requerir conexión a internet obligatoria ni contaminar el sistema operativo anfitrión.
 
 ---
 
-## 📖 De la chispa al fuego: El día en que la forja cobró vida propia
+## De la chispa al fuego: el día en que la forja cobró vida propia
 
 En un mundo de desarrollo cada vez más hiperconectado, donde casi cualquier compilación depende de cadenas de suministro remotas y servidores en la nube que devoran telemetría, siempre he defendido el valor del software artesanal: la soberanía de compilar en local, cara a cara con el silicio.
 
@@ -22,16 +22,16 @@ Hoy sale del taller personal para abrirse al mundo. Si os aporta la misma libert
 > **Aviso sobre la licencia de Windows**:  
 > La máquina virtual `forge-windows` se despliega inicialmente utilizando una imagen oficial de evaluación para desarrollo (*Windows Server Standard Core Evaluation*). Esta versión es idónea para pruebas iniciales, verificación de compilaciones MSVC y experimentación local. Para un uso continuado o en entornos de producción, el usuario es responsable de aplicar su propia licencia válida de Microsoft dentro del entorno virtualizado.
 
-### ❤️ Reconocimientos y Linaje
+### Reconocimientos y linaje
 Un agradecimiento muy especial a los proyectos de la comunidad sobre cuya base se sustenta esta forja:
-* Al equipo del [Bento Project (Chef Software)](https://app.vagrantup.com/bento/boxes/debian-12) por su pulcra y sólida base de **Debian 12**.
-* A [Gusztáv Varga (`gusztavvargadr`)](https://app.vagrantup.com/gusztavvargadr/boxes/windows-server-2022-standard-core) por su encomiable labor automatizando imágenes de **Windows Server Core**.
+* Al equipo del [Bento Project (Chef Software)](https://app.vagrantup.com/bento/boxes/debian-12) por su sólida base de **Debian 12**.
+* A [Gusztáv Varga (`gusztavvargadr`)](https://app.vagrantup.com/gusztavvargadr/boxes/windows-server-2022-standard-core) por su trabajo automatizando imágenes de **Windows Server Core**.
 
-Gracias a su trabajo ha sido posible dar el siguiente paso y consolidar las custom boxes de DevForge en formato VDI.
+Gracias a su trabajo ha sido posible consolidar las custom boxes de DevForge en formato VDI.
 
 ---
 
-## 🚀 Flujo de Trabajo
+## Flujo de trabajo
 
 ```mermaid
 flowchart LR
@@ -45,32 +45,32 @@ flowchart LR
 
 ---
 
-## 🌟 Características Principales
+## Características principales
 
-- **🎯 100% Offline**: Ejecución y empaquetado directo en local sin depender de GitHub Actions ni subir código a la nube.
-- **🌐 Soporte Multi-Lenguaje Nativo**:
+- **100% offline**: Ejecución y empaquetado directo en local sin depender de servicios remotos de CI ni transferir código a la nube.
+- **Soporte multi-lenguaje nativo**:
   - **Rust**: Soporte completo para aplicaciones CLI y GUIs en Tauri.
   - **Java**: OpenJDK 21 LTS y Gradle.
-  - **Python**: Empaquetado en ejecutables independientes con PyInstaller y gestión con UV.
+  - **Python**: Empaquetado en ejecutables independientes con PyInstaller y gestión con UV o Poetry.
   - **Go**: Binarios estáticos de alto rendimiento.
   - **C / C++**: GCC, Clang, CMake y MSVC nativo con enlazado criptográfico del sistema.
   - **Node.js**: Entorno LTS y empaquetadores web modernos.
-- **🛡️ Entornos Aislados e Inmutables**:
+- **Entornos aislados e inmutables**:
   - `forge-linux`: Debian 12 optimizado con enlazador ultrarrápido `mold` y Docker para compilación cruzada hacia macOS.
   - `forge-windows`: Windows Server 2022 Standard Core con Visual Studio 2022 Build Tools (MSVC nativo) y generadores de instaladores (WiX / InnoSetup).
   - `forge-runner`: Debian 12 dedicado con Docker daemon y GitLab Runner para pruebas de integración continua aisladas y 100% offline.
-- **📂 Higiene Absoluta en el Proyecto Cliente**: El proyecto cliente no necesita scripts complejos de virtualización; `dev-forge` monta temporalmente la carpeta y deposita los resultados en `dist/`.
-- **🔗 Integración Universal con Agentes**: Conexión simbólica directa a `.agents` para heredar las directrices y estándares del ecosistema central.
+- **Aislamiento en el proyecto cliente**: El proyecto cliente no necesita scripts complejos de virtualización; `dev-forge` monta temporalmente la carpeta y deposita los resultados en `dist/`.
+- **Integración con directrices de agentes**: Conexión simbólica directa a `.agents` para heredar las directrices y estándares del ecosistema central.
 
 ---
 
-## 📦 Instalación y Requisitos en el Host
+## Instalación y requisitos en el anfitrión
 
 `dev-forge` está diseñado para ejecutarse como orquestador anfitrión en **Linux**, **Windows** y **macOS**:
 
-### Requisitos por Sistema Operativo Anfitrión
+### Requisitos por sistema operativo anfitrión
 
-| Sistema Anfitrión | Hipervisor & Herramientas | Shell Compatible | Instalación Recomendada |
+| Sistema anfitrión | Hipervisor y herramientas | Shell compatible | Instalación recomendada |
 | :--- | :--- | :--- | :--- |
 | **Linux** (Debian, Ubuntu, Fedora, Arch) | VirtualBox (>= 7.0), Vagrant (>= 2.3) | **Bash** (>= 4.0) | `sudo apt install virtualbox vagrant` |
 | **Windows** (10 / 11) | VirtualBox (>= 7.0), Vagrant (>= 2.3) | **PowerShell** (5.1 o 7+) | `winget install Oracle.VirtualBox HashiCorp.Vagrant` o `choco install virtualbox vagrant` |
@@ -81,9 +81,9 @@ flowchart LR
 
 ---
 
-### Preparación del CLI
+### Preparación de la CLI
 
-#### Instalación Universal en 1 Línea (Recomendada):
+#### Instalación universal en una línea (recomendada)
 
 ##### En Linux y macOS (Bash / Zsh):
 ```bash
@@ -99,7 +99,7 @@ irm https://raw.githubusercontent.com/olorinj/dev-forge/main/install.ps1 | iex
 
 ---
 
-#### Instalación desde Repositorio Clonado:
+#### Instalación desde repositorio clonado
 Si has clonado el repositorio localmente, puedes ejecutar el instalador directo:
 ```bash
 # En Linux / macOS:
@@ -109,7 +109,7 @@ Si has clonado el repositorio localmente, puedes ejecutar el instalador directo:
 .\install.ps1
 ```
 
-O utilizar el auto-dimensionamiento del host mediante `install-bin`:
+O utilizar el auto-dimensionamiento del anfitrión mediante `install-bin`:
 ```bash
 # Auto-detecta recursos e instala el ejecutable dev-forge
 dev-forge tune
@@ -118,7 +118,7 @@ dev-forge tune
 dev-forge install-bin
 ```
 
-#### En Linux y macOS (Bash / Zsh):
+#### En Linux y macOS (Bash / Zsh)
 También puedes añadir la carpeta `bin/` al `PATH` o definir un alias:
 ```bash
 # Añadir al PATH permanentemente
@@ -128,7 +128,7 @@ export PATH="/home/usuario/DEV/dev-forge/bin:$PATH"
 alias dev-forge="/home/usuario/DEV/dev-forge/bin/dev-forge"
 ```
 
-#### En Windows (PowerShell):
+#### En Windows (PowerShell)
 Añade la ruta al perfil de PowerShell (`notepad $PROFILE`):
 ```powershell
 # Añadir al PATH de la sesión o del usuario
@@ -138,7 +138,7 @@ $env:Path += ";C:\DEV\dev-forge\bin"
 Set-Alias -Name dev-forge -Value "C:\DEV\dev-forge\bin\dev-forge.ps1"
 ```
 
-#### Ejecución Directa con Python 3:
+#### Ejecución directa con Python 3
 Alternativamente, `dev-forge` puede ejecutarse directamente mediante su motor en Python sin requerir compilación previa:
 ```bash
 # Lanzador directo
@@ -150,18 +150,18 @@ python3 -m dev_forge tune
 
 ---
 
-## 💻 Uso Rápido del CLI
+## Uso rápido de la CLI
 
 El orquestador ofrece paridad total de comandos en ambos shells:
 
 ### 1. Compilar cualquier proyecto
 
-#### Menú Interactivo Guiado (Por Defecto):
+#### Menú interactivo guiado (por defecto)
 Si ejecutas `dev-forge build` sin parámetros, el orquestador inicia un asistente interactivo en terminal para guiarte en 4 pasos:
-1. **Selección de Proyecto**: Si te encuentras en un proyecto, lo selecciona automáticamente; si estás en un directorio neutro, te permite elegir entre los últimos 5 proyectos usados o introducir una ruta manual (con soporte para `~`).
+1. **Selección de proyecto**: Si te encuentras en un proyecto, lo selecciona automáticamente; si estás en un directorio neutro, te permite elegir entre los últimos 5 proyectos usados o introducir una ruta manual (con soporte para `~`).
 2. **Componente**: Todos (CLI + GUI), solo CLI, solo aplicación GUI o ejecutables de prueba (`test runners`).
 3. **Destino (Target OS)**: Todos (Linux, Windows, macOS), solo Linux, solo Windows o solo macOS.
-4. **Formato de Salida**: Binarios directos + Paquetes/Instaladores (AppImage, deb, rpm, MSI, Inno Setup), solo binarios directos, solo paquetes, o **binario único puro** (1 solo ejecutable con versión explícita y aceleración `--no-bundle`).
+4. **Formato de salida**: Binarios directos + paquetes/instaladores (AppImage, deb, rpm, MSI, Inno Setup), solo binarios directos, solo paquetes, o **binario único puro** (1 solo ejecutable con versión explícita y aceleración `--no-bundle`).
 5. **Modo**: Release (optimizado) o Testing / Debug.
 
 ```bash
@@ -169,7 +169,7 @@ Si ejecutas `dev-forge build` sin parámetros, el orquestador inicia un asistent
 dev-forge build
 ```
 
-#### Modo No Interactivo (Flags Directos):
+#### Modo no interactivo (parámetros directos)
 ```bash
 # Compilar proyecto en Rust o Tauri hacia todos los destinos
 dev-forge build -p /ruta/a/mi-proyecto -t all
@@ -190,7 +190,7 @@ dev-forge build -p /ruta/a/mi-app-java -t linux
 dev-forge build -p /ruta/a/mi-script -t windows --compiler nuitka
 ```
 
-#### En Windows (PowerShell):
+#### En Windows (PowerShell)
 ```powershell
 # Compilar proyecto en Rust o Tauri hacia todos los destinos
 .\bin\dev-forge.ps1 build -p C:\proyectos\mi-proyecto -t all
@@ -205,9 +205,9 @@ dev-forge build -p /ruta/a/mi-script -t windows --compiler nuitka
 .\bin\dev-forge.ps1 build -p C:\proyectos\mi-script -t windows -c nuitka
 ```
 
-### 2. Gestión de Máquinas Virtuales
+### 2. Gestión de máquinas virtuales
 
-#### En Linux / macOS:
+#### En Linux / macOS
 ```bash
 dev-forge status         # Consultar estado de las VMs
 dev-forge up forge-linux # Iniciar máquina Linux
@@ -215,7 +215,7 @@ dev-forge halt           # Detener todas las VMs para liberar RAM
 dev-forge ssh            # Abrir terminal interactiva en forge-linux
 ```
 
-#### En Windows (PowerShell):
+#### En Windows (PowerShell)
 ```powershell
 .\bin\dev-forge.ps1 status         # Consultar estado de las VMs
 .\bin\dev-forge.ps1 up forge-linux # Iniciar máquina Linux
@@ -223,41 +223,41 @@ dev-forge ssh            # Abrir terminal interactiva en forge-linux
 .\bin\dev-forge.ps1 ssh            # Sesión SSH en Linux
 ```
 
-### 3. Validación de Salud y Pruebas del Entorno (`test-vm`)
+### 3. Validación de salud y pruebas del entorno (`test-vm`)
 
-Para verificar que los toolchains, variables del kernel y enlazadores estén 100% operativos dentro de cada máquina virtual:
+Para verificar que las toolchains, variables del kernel y enlazadores estén 100% operativos dentro de cada máquina virtual:
 
-#### En Linux / macOS:
+#### En Linux / macOS
 ```bash
 dev-forge test-vm forge-linux   # Verifica servicios, kernel sysctl, tmpfs y ccache en Debian 12
 dev-forge test-vm forge-windows # Verifica toolchains (MSVC, Rust, Python, Go, Node, Java, CMake, Ninja)
 ```
 
-#### En Windows:
+#### En Windows
 ```powershell
 .\bin\dev-forge.ps1 test-vm forge-linux
 .\bin\dev-forge.ps1 test-vm forge-windows
 ```
 
-### 4. Diagnóstico Pre-Vuelo (`doctor`) y Mantenimiento de Caché
+### 4. Diagnóstico previo (`doctor`) y mantenimiento de caché
 
-Audita automáticamente la virtualización por hardware (VT-x/AMD-V), memoria RAM, espacio en disco, estado de VirtualBox/Vagrant, puertos y controladores del host:
+Audita automáticamente la virtualización por hardware (VT-x/AMD-V), memoria RAM, espacio en disco, estado de VirtualBox/Vagrant, puertos y controladores del anfitrión:
 
-#### En Linux / macOS:
+#### En Linux / macOS
 ```bash
-dev-forge doctor                     # Auditoría integral pre-vuelo del host y las VMs
+dev-forge doctor                     # Auditoría integral previa del host y las VMs
 dev-forge clean-cache                # Limpiar toda la caché persistente (~/.dev-forge/cache)
 dev-forge clean-cache -s cargo       # Limpiar solo la caché de un subsistema (cargo, go, pip, gradle, sccache)
 ```
 
-#### En Windows:
+#### En Windows
 ```powershell
 .\bin\dev-forge.ps1 doctor
 .\bin\dev-forge.ps1 clean-cache
 .\bin\dev-forge.ps1 clean-cache -s cargo
 ```
 
-### 5. Configuración de Entornos de Desarrollo en VS Code (`ide`)
+### 5. Configuración de entornos de desarrollo en VS Code (`ide`)
 
 `dev-forge` permite convertir la máquina virtual `forge-linux` en un entorno de desarrollo interactivo para VS Code conectado vía SSH con todas las herramientas nativas del lenguaje:
 
@@ -272,11 +272,11 @@ dev-forge ide setup-vscode -p /ruta/a/mi-proyecto --profile python
 dev-forge ide setup-vscode -p /ruta/a/mi-proyecto --profile go
 ```
 
-### 6. Orquestación Aislada de CI/CD Runners (`runner`)
+### 6. Orquestación aislada de CI/CD runners (`runner`)
 
 Para validar pipelines de integración continua (`.gitlab-ci.yml`) sin contaminar el host ni depender de minutos en la nube, `dev-forge` ofrece un entorno runner aislado con Docker y GitLab Runner:
 
-#### En Linux / macOS:
+#### En Linux / macOS
 ```bash
 # Iniciar la máquina virtual del runner
 dev-forge runner up
@@ -293,7 +293,7 @@ dev-forge runner ssh
 dev-forge runner halt
 ```
 
-#### En Windows (PowerShell):
+#### En Windows (PowerShell)
 ```powershell
 .\bin\dev-forge.ps1 runner up
 .\bin\dev-forge.ps1 runner register <TOKEN> [https://gitlab.com]
@@ -306,16 +306,16 @@ Para más detalles sobre la arquitectura del runner aislado, consulta [`docs/git
 
 ---
 
-## 🧪 Banco de Pruebas Multi-Lenguaje (`HashForge`)
+## Banco de pruebas multi-lenguaje (`HashForge`)
 
 `dev-forge` incluye un banco de pruebas integral en [`examples/hashforge/`](examples/hashforge/README.md) compuesto por **7 implementaciones** que calculan exactamente los mismos resúmenes criptográficos (**SHA-256** y **MD5**) sobre un vector de prueba constante (`"dev-forge test"`):
 
 - **SHA-256 esperado**: `3424cecd9bc9384046f4b97b5012cc51037a0a58cbf547642dc71dc6a0ac0825`
 - **MD5 esperado**: `253c885072f588436970bcbc0fe47b9e`
 
-### Matriz de Lenguajes Soportados en el Test
+### Matriz de lenguajes soportados en el test
 
-| Lenguaje | Directorio | Sistema de Construcción | Salida Linux | Salida Windows (Binario + Setup + MSI) |
+| Lenguaje | Directorio | Sistema de construcción | Salida Linux | Salida Windows (Binario + Setup + MSI) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Rust** | [`rust/`](examples/hashforge/rust/) | Cargo | `dist/hashforge` (ELF 64-bit) | `dist/hashforge.exe` + `-setup.exe` + `.msi` |
 | **Python** | [`python/`](examples/hashforge/python/) | PyInstaller / UV | `dist/hashforge-py` | `dist/hashforge-py.exe` + `-setup.exe` + `.msi` |
@@ -326,11 +326,11 @@ Para más detalles sobre la arquitectura del runner aislado, consulta [`docs/git
 | **Node.js** | [`node/`](examples/hashforge/node/) | Node.js / Web Crypto | `dist/hashforge-node.js` | `dist/hashforge-node.js` |
 
 > [!TIP]
-> **Empaquetado e Iconos Automáticos en Windows**: En cada compilación para Windows, `dev-forge` detecta automáticamente si el proyecto tiene un icono (`.ico` o `.png`, con conversión automática a ICO multi-resolución) y genera simultáneamente en `dist/` el ejecutable autónomo (`.exe`), el instalador ejecutable Inno Setup (`<app>-setup.exe`) y el paquete corporativo Windows Installer (`<app>.msi`), vinculando el icono a accesos directos y al desinstalador de Windows.
+> **Empaquetado e iconos automáticos en Windows**: En cada compilación para Windows, `dev-forge` detecta automáticamente si el proyecto tiene un icono (`.ico` o `.png`, con conversión automática a ICO multi-resolución) y genera simultáneamente en `dist/` el ejecutable autónomo (`.exe`), el instalador ejecutable Inno Setup (`<app>-setup.exe`) y el paquete corporativo Windows Installer (`<app>.msi`), vinculando el icono a accesos directos y al desinstalador de Windows.
 
-### Ejecución de Pruebas para Todos los Lenguajes
+### Ejecución de pruebas para todos los lenguajes
 
-#### En Linux / macOS (Bash):
+#### En Linux / macOS (Bash)
 ```bash
 # Ejecutar TODOS los lenguajes en AMBAS máquinas virtuales (Linux y Windows):
 bash examples/hashforge/test.sh all all
@@ -347,7 +347,7 @@ bash examples/hashforge/test.sh rust windows
 bash examples/hashforge/test.sh python windows
 ```
 
-#### En Windows (PowerShell):
+#### En Windows (PowerShell)
 ```powershell
 # Ejecutar TODOS los lenguajes en AMBAS máquinas virtuales:
 .\examples\hashforge\test.ps1 -Language all -Target all
@@ -362,24 +362,24 @@ bash examples/hashforge/test.sh python windows
 ```
 
 > [!NOTE]
-> Para más detalles sobre cada lenguaje y compilación individual, consulta la [Guía Completa de HashForge](examples/hashforge/README.md).
+> Para más detalles sobre cada lenguaje y compilación individual, consulta la [Guía completa de HashForge](examples/hashforge/README.md).
 
 ---
 
-## 📚 Documentación Técnica Detallada
+## Documentación técnica detallada
 
 Para consultar detalles de implementación, diagramas de arquitectura interna o guías específicas, revisa los documentos dedicados:
 
-- 📐 **[Arquitectura del Sistema y Flujo de Datos](docs/architecture.md)**
-- 📦 **[Guía y Procedimiento de Custom Boxes (Empaquetado y Actualización)](docs/vagrant-boxes-guide.md)**
-- 🤖 **[Arquitectura de Subagentes Especializados y Flujo de Delegación](docs/subagents.md)**
-- 🍏 **[Compilación y Firmado de GUIs para macOS desde Linux](docs/macos-gui-compilation.md)**
-- 📖 **[Referencia de Lenguajes y Ecosistemas Soportados](docs/supported-languages.md)**
-- 📋 **[Registro de Cambios (Changelog)](CHANGELOG.md)**
+- [Arquitectura del sistema y flujo de datos](docs/architecture.md)
+- [Guía y procedimiento de custom boxes (empaquetado y actualización)](docs/vagrant-boxes-guide.md)
+- [Arquitectura de subagentes especializados y flujo de delegación](docs/subagents.md)
+- [Compilación y firmado de interfaces gráficas para macOS desde Linux](docs/macos-gui-compilation.md)
+- [Referencia de lenguajes y ecosistemas soportados](docs/supported-languages.md)
+- [Registro de cambios (Changelog)](CHANGELOG.md)
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 Este proyecto está licenciado bajo los estándares internos del ecosistema de desarrollo de software.
 
