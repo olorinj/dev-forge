@@ -10,7 +10,7 @@
 
 En un mundo de desarrollo cada vez más hiperconectado, donde casi cualquier compilación depende de cadenas de suministro remotas y servidores en la nube que devoran telemetría, siempre he defendido el valor del software artesanal: la soberanía de compilar en local, cara a cara con el silicio.
 
-Todo desarrollador conoce esa sensación: estás inmerso en un proyecto apasionante —en mi caso, forjando el escudo de privacidad criptográfica de [LexiShield](https://github.com/olorinj/lexishield)— y de pronto te encuentras en un laberinto de entornos. Necesitas que tu criatura hable con soltura en Linux, vista con elegancia nativa en Windows y respire en macOS.
+Todo desarrollador conoce esa sensación: estás inmerso en un proyecto apasionante (en mi caso, forjando el escudo de privacidad criptográfica de [LexiShield](https://github.com/olorinj/lexishield)) y de pronto te encuentras en un laberinto de entornos. Necesitas que tu criatura hable con soltura en Linux, vista con elegancia nativa en Windows y respire en macOS.
 
 Al principio, **dev-forge** era solo un humilde aprendiz en el rincón más oscuro del taller: unos cuantos scripts de apoyo para no tener que saturar mi máquina anfitriona con gigabytes de SDKs incompatibles ni alterar mi sistema operativo personal o corporativo. Pero los proyectos, al igual que los personajes en una buena historia, tienen la costumbre de crecer, evolucionar y reclamar su propio destino.
 
