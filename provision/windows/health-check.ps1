@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # dev-forge : Health-Check & Validation Suite for Windows Server 2022 Core
 # =============================================================================
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -29,6 +29,9 @@ Write-Host "`n1. Verificando Toolchains de Compilacion..." -ForegroundColor Yell
 Assert-Tool "Rust Compiler (rustc)" { rustc --version }
 Assert-Tool "Cargo Package Manager" { cargo --version }
 Assert-Tool "Python Runtime" { python --version }
+Assert-Tool "Astral uv Package Manager" { uv --version }
+Assert-Tool "Poetry Package Manager" { poetry --version }
+Assert-Tool "Git VCS (GitHub Source)" { git --version }
 Assert-Tool "Go Compiler" { go version }
 Assert-Tool "Node.js Runtime" { node --version }
 Assert-Tool "Java SDK (javac)" { javac -version }

@@ -1012,6 +1012,11 @@ def build_on_windows(
                     f"}}"
                 )
         elif ptype.kind == ProjectTypeKind.PYTHON:
+            pkg_cmd = (
+                "if (Test-Path poetry.lock) { poetry build } "
+                "elseif (Test-Path uv.lock) { uv build --out-dir C:\\workspace\\dist } "
+                "else { python -m build -o C:\\workspace\\dist }"
+            )
             if use_nuitka:
                 py_cmd = (
                     f"if (Test-Path main.py) {{ "
@@ -1025,7 +1030,7 @@ def build_on_windows(
                     f"Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
                     f"if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ "
                     f"  Copy-Item C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe -Force; exit 0 "
-                    f"}} else {{ exit 1 }} }} }} else {{ python -m build -o C:\\workspace\\dist }}"
+                    f"}} else {{ exit 1 }} }} }} else {{ {pkg_cmd} }}"
                 )
             else:
                 py_cmd = (
@@ -1035,7 +1040,7 @@ def build_on_windows(
                     f"Invoke-Expression \"python -m PyInstaller --clean -F --name {app_name}-cli-windows.x86_64 $icoOpt main.py --distpath C:\\workspace\\dist 2>&1\" | Out-Host; "
                     f"if (Test-Path C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe) {{ "
                     f"  Copy-Item C:\\workspace\\dist\\{app_name}-cli-windows.x86_64.exe C:\\workspace\\dist\\{app_name}-cli-{raw_ver}-windows.x86_64.exe -Force; exit 0 "
-                    f"}} else {{ exit 1 }} }} else {{ python -m build -o C:\\workspace\\dist }}"
+                    f"}} else {{ exit 1 }} }} else {{ {pkg_cmd} }}"
                 )
             build_ps = f"{init_prefix}Set-Location C:\\workspace; if (-not (Test-Path C:\\workspace\\dist)) {{ New-Item -ItemType Directory -Path C:\\workspace\\dist -Force | Out-Null }}; {py_cmd}"
         elif ptype.kind == ProjectTypeKind.CCPP:

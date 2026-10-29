@@ -192,19 +192,54 @@
           }
 
     # -------------------------------------------------------------------------
-    # 6. TOOLCHAIN DE PYTHON
+    # 6. TOOLCHAIN DE PYTHON (Python 3.14 Oficial, uv, Poetry y Multiversión)
     # -------------------------------------------------------------------------
-    - name: Instalar Python 3.12 con Chocolatey
-      chocolatey.chocolatey.win_chocolatey:
-        name: python312
-        state: present
-
-    - name: Instalar herramientas de compilación de Python (pip --no-cache-dir, nuitka, pyinstaller)
+    - name: Instalar Python 3.14 Oficial x64 de forma nativa desatendida
       ansible.windows.win_powershell:
         script: |
-          $pyPath = "$env:ProgramFiles\Python312;$env:ProgramFiles\Python312\Scripts"
+          $pyExe = "$env:ProgramFiles\Python314\python.exe"
+          if (-not (Test-Path $pyExe)) {
+            $installer = "$env:TEMP\python-3.14.0-amd64.exe"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            & curl.exe -sSfL "https://www.python.org/ftp/python/3.14.0/python-3.14.0-amd64.exe" -o $installer
+            $proc = Start-Process -FilePath $installer -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Include_test=0" -Wait -PassThru
+            Remove-Item -Force $installer -ErrorAction SilentlyContinue
+            if ($proc.ExitCode -notin @(0, 3010)) {
+              throw "Error instalando Python 3.14. Exit code: $($proc.ExitCode)"
+            }
+          }
+          # Eliminar shims dummy de Microsoft Store
+          Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WindowsApps" -Filter "python*.exe" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+          # Asegurar variables de entorno globales
+          $pyPath = "C:\Program Files\Python314;C:\Program Files\Python314\Scripts"
+          $currPath = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+          if ($currPath -notlike "*Python314*") {
+            [System.Environment]::SetEnvironmentVariable('Path', "$pyPath;$currPath", 'Machine')
+          }
+
+    - name: Instalar Astral uv y suite multipython (3.10..3.13)
+      ansible.windows.win_powershell:
+        script: |
+          if (-not (Get-Command uv.exe -ErrorAction SilentlyContinue)) {
+            powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+            $uvDir = "$env:USERPROFILE\.local\bin"
+            if (Test-Path "$uvDir\uv.exe") {
+              $currPath = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+              if ($currPath -notlike "*$uvDir*") {
+                [System.Environment]::SetEnvironmentVariable('Path', "$uvDir;$currPath", 'Machine')
+              }
+              $env:PATH = "$uvDir;$env:PATH"
+            }
+          }
+          # Pre-instalar suite multipython para testing y compilación de wheels matriciales
+          & uv python install 3.10 3.11 3.12 3.13 2>&1 | Write-Host
+
+    - name: Instalar Poetry y herramientas de compilación y empaquetado de Python
+      ansible.windows.win_powershell:
+        script: |
+          $pyPath = "C:\Program Files\Python314;C:\Program Files\Python314\Scripts"
           $env:PATH = "$pyPath;$env:PATH"
-          python -m pip install --no-cache-dir --upgrade pip nuitka pyinstaller wheel setuptools
+          python -m pip install --no-cache-dir --upgrade pip poetry nuitka pyinstaller wheel setuptools build tox
 
     # -------------------------------------------------------------------------
     # 7. TOOLCHAINS DE GO, NODE.JS Y JAVA
