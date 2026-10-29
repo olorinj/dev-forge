@@ -243,6 +243,31 @@ class TestDevForge(unittest.TestCase):
         self.assertEqual(args.token, "token-xyz")
         self.assertEqual(args.url, "https://gitlab.example.com")
 
+    def test_join_bash_commands_safety(self):
+        from dev_forge.vagrant import join_bash_commands, validate_bash_syntax_failfast
+
+        # Simulates the exact failure case: valid loop with trailing semicolons and whitespaces
+        part1 = "mkdir -p /workspace/dist; for f in a b; do echo $f; done; "
+        part2 = "echo '[dev-forge : macOS : AVISO] Test aviso.'; "
+        combined = join_bash_commands([part1, part2])
+
+        self.assertNotIn("; ;", combined)
+        self.assertNotIn(";;", combined)
+        # Verify valid bash syntax via failfast helper (should not raise SystemExit)
+        validate_bash_syntax_failfast(combined, "test_bash")
+
+    def test_join_powershell_commands_safety(self):
+        from dev_forge.vagrant import join_powershell_commands
+
+        part1 = "Set-Location C:\\workspace; cargo build --release; "
+        part2 = "if (Test-Path dist) { Write-Host 'Done' }; "
+        combined = join_powershell_commands([part1, part2])
+
+        self.assertNotIn("; ;", combined)
+        self.assertIn("\n", combined)
+        self.assertTrue(combined.startswith("Set-Location"))
+
+
 
 if __name__ == "__main__":
     unittest.main()

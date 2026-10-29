@@ -16,6 +16,60 @@ from dev_forge.detector import (
 from dev_forge.hardware import detect_hardware
 
 
+def join_bash_commands(commands: List[str]) -> str:
+    """Safely combine multiple bash command snippets using newline separators.
+
+    Cleans up any leading/trailing whitespace and trailing semicolons or ampersands
+    so that concatenations never produce syntax errors like '; ;' or orphaned operators.
+    """
+    valid_blocks: List[str] = []
+    for cmd in commands:
+        if not cmd:
+            continue
+        cleaned = cmd.strip()
+        while cleaned.endswith(";") or cleaned.endswith("&"):
+            cleaned = cleaned[:-1].strip()
+        if cleaned:
+            valid_blocks.append(cleaned)
+    return "\n".join(valid_blocks)
+
+
+def validate_bash_syntax_failfast(script: str, context_label: str = "Linux/macOS") -> None:
+    """Validate script syntax using `bash -n` and fail-fast if syntax errors exist."""
+    res = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
+    if res.returncode != 0:
+        err_msg = res.stderr.strip() or f"Código de error {res.returncode}"
+        log_err(f"Error sintáctico detectado en el script generado para {context_label}:\n{err_msg}")
+        sys.exit(1)
+
+
+def join_powershell_commands(commands: List[str]) -> str:
+    """Safely combine multiple PowerShell command snippets using newline separators.
+
+    Cleans up leading/trailing whitespace and trailing semicolons.
+    Also validates basic parenthesis and bracket balancing.
+    """
+    valid_blocks: List[str] = []
+    for cmd in commands:
+        if not cmd:
+            continue
+        cleaned = cmd.strip()
+        while cleaned.endswith(";"):
+            cleaned = cleaned[:-1].strip()
+        if cleaned:
+            valid_blocks.append(cleaned)
+    combined = "\n".join(valid_blocks)
+
+    # Structural balance check
+    for open_char, close_char, name in [("{", "}", "llaves"), ("(", ")", "paréntesis"), ("[", "]", "corchetes")]:
+        if combined.count(open_char) != combined.count(close_char):
+            log_warn(
+                f"[dev-forge : Windows] Desbalance estructural detectado en script PowerShell: "
+                f"{name} '{open_char}' ({combined.count(open_char)}) != '{close_char}' ({combined.count(close_char)})."
+            )
+    return combined
+
+
 def is_dev_forge_root(p: Path) -> bool:
     return (p / "Vagrantfile").is_file() and (
         (p / "provision" / "ansible" / "linux.yml").is_file()
@@ -699,16 +753,16 @@ def build_on_linux(
     else:
         macos_script = "echo '[dev-forge : macOS] Compilación para macOS omitida para este tipo de proyecto.';"
 
-    combined_script = ""
-    if build_linux:
-        combined_script += linux_script
-    if build_macos:
-        if combined_script:
-            combined_script += "; "
-        combined_script += macos_script
+    script_parts = [mount_prefix]
+    if build_linux and linux_script:
+        script_parts.append(linux_script)
+    if build_macos and macos_script:
+        script_parts.append(macos_script)
+
+    full_cmd = join_bash_commands(script_parts)
+    validate_bash_syntax_failfast(full_cmd, context_label="forge-linux (Linux/macOS)")
 
     log_info("Ejecutando proceso de compilación remota aislada...")
-    full_cmd = f"{mount_prefix}{combined_script}"
     success = run_vagrant_streaming(["ssh", "forge-linux", "-c", full_cmd], envs)
 
     # Clean unmount
@@ -1008,12 +1062,12 @@ def build_on_windows(
         ""
         if (package == "bin" or is_test_mode)
         else (
-            f"; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ "
+            f"if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ "
             f"& 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' "
             f"-AppVersion '{raw_ver}' -WixVersion '{wix_ver}' -GitBranch '{branch}' }}"
         )
     )
-    full_cmd = f"{build_ps}{pack_ps}"
+    full_cmd = join_powershell_commands([build_ps, pack_ps])
 
     log_info("Ejecutando proceso de compilación remota en Windows Server Core...")
     success = run_vagrant_streaming(["winrm", "forge-windows", "-s", "powershell", "-c", full_cmd], envs)

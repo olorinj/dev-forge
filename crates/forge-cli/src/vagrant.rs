@@ -10,6 +10,77 @@ use colored::Colorize;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+pub fn join_bash_commands(commands: &[&str]) -> String {
+    let mut valid_blocks = Vec::new();
+    for cmd in commands {
+        let mut cleaned = cmd.trim();
+        while cleaned.ends_with(';') || cleaned.ends_with('&') {
+            cleaned = cleaned[..cleaned.len() - 1].trim();
+        }
+        if !cleaned.is_empty() {
+            valid_blocks.push(cleaned);
+        }
+    }
+    valid_blocks.join("\n")
+}
+
+pub fn validate_bash_syntax_failfast(script: &str, context_label: &str) -> Result<()> {
+    let mut child = Command::new("bash")
+        .arg("-n")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| "No se pudo invocar 'bash' para verificar la sintaxis del script")?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        let _ = stdin.write_all(script.as_bytes());
+    }
+
+    let output = child.wait_with_output()?;
+    if !output.status.success() {
+        let err_msg = String::from_utf8_lossy(&output.stderr);
+        log_err(&format!(
+            "Error sintáctico detectado en el script generado para {context_label}:\n{}",
+            err_msg.trim()
+        ));
+        anyhow::bail!("Sintaxis de bash inválida en script para {}", context_label);
+    }
+    Ok(())
+}
+
+pub fn join_powershell_commands(commands: &[&str]) -> String {
+    let mut valid_blocks = Vec::new();
+    for cmd in commands {
+        let mut cleaned = cmd.trim();
+        while cleaned.ends_with(';') {
+            cleaned = cleaned[..cleaned.len() - 1].trim();
+        }
+        if !cleaned.is_empty() {
+            valid_blocks.push(cleaned);
+        }
+    }
+    let combined = valid_blocks.join("\n");
+
+    for (open_char, close_char, name) in [
+        ('{', '}', "llaves"),
+        ('(', ')', "paréntesis"),
+        ('[', ']', "corchetes"),
+    ] {
+        let count_open = combined.chars().filter(|&c| c == open_char).count();
+        let count_close = combined.chars().filter(|&c| c == close_char).count();
+        if count_open != count_close {
+            log_warn(&format!(
+                "[dev-forge : Windows] Desbalance estructural detectado en script PowerShell: {} '{}' ({}) != '{}' ({}).",
+                name, open_char, count_open, close_char, count_close
+            ));
+        }
+    }
+
+    combined
+}
+
 pub fn is_dev_forge_root(p: &Path) -> bool {
     p.join("Vagrantfile").is_file()
         && (p.join("provision/ansible/linux.yml").is_file()
@@ -823,19 +894,18 @@ EOF_DOCKER\n\
         }
     };
 
-    let mut combined_script = String::new();
-    if build_linux {
-        combined_script.push_str(&linux_script);
+    let mut parts: Vec<&str> = vec![&mount_prefix];
+    if build_linux && !linux_script.is_empty() {
+        parts.push(&linux_script);
     }
-    if build_macos {
-        if !combined_script.is_empty() {
-            combined_script.push_str("; ");
-        }
-        combined_script.push_str(&macos_script);
+    if build_macos && !macos_script.is_empty() {
+        parts.push(&macos_script);
     }
 
+    let full_script = join_bash_commands(&parts);
+    validate_bash_syntax_failfast(&full_script, "forge-linux (Linux/macOS)")?;
+
     log_info("Ejecutando proceso de compilacion remota aislada...");
-    let full_script = format!("{}{}", mount_prefix, combined_script);
     let success = run_vagrant_streaming(&["ssh", "forge-linux", "-c", &full_script], envs)?;
     let _ = run_vagrant_streaming(
         &[
@@ -1150,11 +1220,11 @@ fn build_on_windows(
         "".to_string()
     } else {
         format!(
-            "; if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ & 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' -AppVersion '{}' -WixVersion '{}' -GitBranch '{}' }}",
+            "if (Test-Path 'C:\\forge\\provision\\windows\\package-artifacts.ps1') {{ & 'C:\\forge\\provision\\windows\\package-artifacts.ps1' -DistDir 'C:\\workspace\\dist' -TargetDir 'C:\\target' -WorkspaceDir 'C:\\workspace' -AppVersion '{}' -WixVersion '{}' -GitBranch '{}' }}",
             ver_info.raw, ver_info.wix, ver_info.branch
         )
     };
-    let full_cmd = format!("{}{}", build_ps, pack_ps);
+    let full_cmd = join_powershell_commands(&[&build_ps, &pack_ps]);
 
     log_info("Maximizando límites de memoria de la sesión WinRM en forge-windows (8192 MB)...");
     let _ = run_vagrant_streaming(
@@ -1619,4 +1689,31 @@ fn print_build_summary(opts: &BuildSummaryOptions) {
         "================================================================================".cyan()
     );
     eprintln!();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_join_bash_commands_safety() {
+        let part1 = "mkdir -p /workspace/dist; for f in a b; do echo $f; done; ";
+        let part2 = "echo '[dev-forge : macOS : AVISO] Test aviso.'; ";
+        let combined = join_bash_commands(&[part1, part2]);
+
+        assert!(!combined.contains("; ;"));
+        assert!(!combined.contains(";;"));
+        assert!(validate_bash_syntax_failfast(&combined, "test_bash").is_ok());
+    }
+
+    #[test]
+    fn test_join_powershell_commands_safety() {
+        let part1 = "Set-Location C:\\workspace; cargo build --release; ";
+        let part2 = "if (Test-Path dist) { Write-Host 'Done' }; ";
+        let combined = join_powershell_commands(&[part1, part2]);
+
+        assert!(!combined.contains("; ;"));
+        assert!(combined.contains('\n'));
+        assert!(combined.starts_with("Set-Location"));
+    }
 }
